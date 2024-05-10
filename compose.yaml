@@ -7,3 +7,5 @@ services:
     volumes:
       - .:/app
     container_name: cmdo_project
+    network_mode: "host"
+    image: multiple-couriers-planning-cdmo:latest
