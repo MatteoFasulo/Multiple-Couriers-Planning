@@ -1,0 +1,9 @@
+version: '3.9'
+services:
+  cdmo:
+    build:
+      context: .
+    command: python ......
+    volumes:
+      - .:/app
+    container_name: cmdo_project
