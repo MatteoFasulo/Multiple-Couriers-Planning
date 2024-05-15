@@ -1,2 +1,5 @@
 ortools
 z3-solver
+matplotlib
+networkx
+pygraphviz
