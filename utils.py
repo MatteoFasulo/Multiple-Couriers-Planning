@@ -21,9 +21,9 @@ def parser_obj():
         epilog='Developed by: Antonello Gravina, Maksim Omelchenko & Matteo Fasulo'
     )
 
-    parser.add_argument('--instance', type=str, metavar='--i', help='Input instance', required=True)
-    parser.add_argument('--runall', type=bool, help='Run on all instances', default=False, required=False)
-    parser.add_argument('--verbose', type=bool, metavar='--v', help='Verbose mode', default=False, required=False)
+    parser.add_argument('--instance', type=str, metavar='--i', help='Input instance', required=False)
+    parser.add_argument('--runall', help='Run all instances', default=False, required=False, action='store_true')
+    parser.add_argument('--verbose', help='Verbose mode', default=False, required=False, action='store_true')
     
     return parser.parse_args()
 
