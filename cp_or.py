@@ -135,11 +135,6 @@ def main(args):
             TENSOR[i].append([])
             for k in range(COURIERS):
                 TENSOR[i][j].append(model.NewBoolVar(f'x_{i}_{j}_{k}'))
-    #if symm:
-    #    TENSOR = np.array(TENSOR)
-    #    TENSOR = TENSOR[np.triu_indices(NODES)]
-    #    # Convert the tensor to a list
-    #    TENSOR = TENSOR.tolist()
                     
     # Constraints
     apply_constraints(model, TENSOR, NODES, COURIERS, SIZE, MAX_LOAD)
@@ -149,7 +144,7 @@ def main(args):
     if symm:
         # We're only considering the upper triangular part of the matrix
         for k in range(COURIERS):
-            arr_dist.append(sum(D[i][j] * TENSOR[i][j][k] for i in range(NODES) for j in range(i, NODES))) 
+            arr_dist.append(sum(D[i][j] * TENSOR[i][j][k] for i in range(NODES) for j in range(i+1, NODES))) 
 
         obj = model.NewIntVar(0, sum(sum(row[i:]) for i, row in enumerate(D)), 'max_distance')
     else:
