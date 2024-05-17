@@ -18,7 +18,7 @@ def parser_obj():
     parser  = argparse.ArgumentParser(
         prog='CP OR',
         description='CP OR solver',
-        epilog='Developed by: Antonello Gravina, Maksim Omelchenko & Matteo Fasulo'
+        epilog='Developed by: Antonio Gravina, Maksim Omelchenko & Matteo Fasulo'
     )
 
     parser.add_argument('--instance', type=str, metavar='--i', help='Input instance', required=False)
