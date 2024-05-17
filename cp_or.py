@@ -162,7 +162,7 @@ def main(args):
     solver.parameters.log_search_progress = True
     #solver.parameters.num_search_workers = 1
     solver.parameters.linearization_level = 2
-    solver.parameters.symmetry_level = 3 # test
+    # solver.parameters.symmetry_level = 2
     status = solver.Solve(model)
 
     if status == cp_model.OPTIMAL or status == cp_model.FEASIBLE:
