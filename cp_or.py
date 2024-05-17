@@ -38,42 +38,7 @@ def preprocess(D):
     D = np.delete(D, -1, axis=1)
     return D
 
-def main(args):
-    if args.instance is None:
-        print('Error: missing instance')
-        sys.exit(1)
-    instance = read_instance(args.instance)
-
-    print("Instance: ", args.instance)
-
-    COURIERS = instance['m']
-    ITEMS = instance['n']
-    MAX_LOAD = instance['l']
-    SIZE = [0] + instance['s']
-    D = instance['D']
-    NODES = ITEMS + 1
-
-    # Preprocess the distance matrix
-    D = preprocess(D)
-    symm = check_symmetric(D)
-
-    model = cp_model.CpModel()
-
-    # Decision variables
-    TENSOR = []
-    for i in range(NODES):
-        TENSOR.append([])
-        for j in range(NODES):
-            TENSOR[i].append([])
-            for k in range(COURIERS):
-                TENSOR[i][j].append(model.NewBoolVar(f'x_{i}_{j}_{k}'))
-    if symm:
-        TENSOR = np.array(TENSOR)
-        TENSOR = TENSOR[np.triu_indices(NODES)]
-        # Convert the tensor to a list
-        TENSOR = TENSOR.tolist()
-                    
-    # Constraints
+def apply_constraints(model, TENSOR, NODES, COURIERS, SIZE, MAX_LOAD):
     # 1) Vehicle leaves node it enters
     for j in range(NODES):
         for k in range(COURIERS):
@@ -141,13 +106,57 @@ def main(args):
                 if i != j:
                     model.Add(u[k][i] - u[k][j] + 1 <= (NODES - 1)*(1 - TENSOR[i][j][k]))
 
+def main(args):
+    if args.instance is None:
+        print('Error: missing instance')
+        sys.exit(1)
+    instance = read_instance(args.instance)
+
+    print("Instance: ", args.instance)
+
+    COURIERS = instance['m']
+    ITEMS = instance['n']
+    MAX_LOAD = instance['l']
+    SIZE = [0] + instance['s']
+    D = instance['D']
+    NODES = ITEMS + 1
+
+    # Preprocess the distance matrix
+    D = preprocess(D)
+    symm = check_symmetric(D)
+
+    model = cp_model.CpModel()
+
+    # Decision variables
+    TENSOR = []
+    for i in range(NODES):
+        TENSOR.append([])
+        for j in range(NODES):
+            TENSOR[i].append([])
+            for k in range(COURIERS):
+                TENSOR[i][j].append(model.NewBoolVar(f'x_{i}_{j}_{k}'))
+    #if symm:
+    #    TENSOR = np.array(TENSOR)
+    #    TENSOR = TENSOR[np.triu_indices(NODES)]
+    #    # Convert the tensor to a list
+    #    TENSOR = TENSOR.tolist()
+                    
+    # Constraints
+    apply_constraints(model, TENSOR, NODES, COURIERS, SIZE, MAX_LOAD)
 
     # Objective function: minimize the maximum distance traveled by any vehicle
     arr_dist = []
-    for k in range(COURIERS):
-        arr_dist.append(sum(D[i][j] * TENSOR[i][j][k] for i in range(NODES) for j in range(NODES)))
-    
-    obj = model.NewIntVar(0, sum(sum(row) for row in D), 'max_distance')
+    if symm:
+        # We're only considering the upper triangular part of the matrix
+        for k in range(COURIERS):
+            arr_dist.append(sum(D[i][j] * TENSOR[i][j][k] for i in range(NODES) for j in range(i, NODES))) 
+
+        obj = model.NewIntVar(0, sum(sum(row[i:]) for i, row in enumerate(D)), 'max_distance')
+    else:
+        for k in range(COURIERS):
+            arr_dist.append(sum(D[i][j] * TENSOR[i][j][k] for i in range(NODES) for j in range(NODES)))
+        
+        obj = model.NewIntVar(0, sum(sum(row) for row in D), 'max_distance')
     model.AddMaxEquality(obj, arr_dist)
 
     # Minimize the objective function
@@ -158,6 +167,7 @@ def main(args):
     solver.parameters.log_search_progress = True
     #solver.parameters.num_search_workers = 1
     solver.parameters.linearization_level = 2
+    solver.parameters.symmetry_level = 3 # test
     status = solver.Solve(model)
 
     if status == cp_model.OPTIMAL or status == cp_model.FEASIBLE:
