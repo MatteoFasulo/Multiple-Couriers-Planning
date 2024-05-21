@@ -66,34 +66,7 @@ def apply_constraints(model, TENSOR, NODES, COURIERS, SIZE, MAX_LOAD):
     for i in range(1, NODES):
         model.add(sum(TENSOR[i][j][k] for j in range(NODES) for k in range(COURIERS)) == 1)
 
-    # 7) Explicit Dantzig-Fulkerson-Johnson (subtour elimination)
-    # Generate all possible subsets (except the empty set and sets with depot)
-    #for i in range(1, (2**(NODES-1))):
-    #    #print(bin(i))
-    #    subset = []
-    #    notsubset = [0]
-    #    t = 1
-    #    while t < NODES:
-    #        if i % 2 == 1:
-    #            subset.append(t)
-    #        else:
-    #            notsubset.append(t)
-    #        i //= 2
-    #        t += 1
-    #    if len(subset)<2:
-    #        continue
-#
-    #    #print(subset, notsubset)
-    #    
-    #    S = 0
-    #    for node1 in subset:
-    #        for node2 in notsubset:
-    #            for k in range(COURIERS):
-    #                S += TENSOR[node1][node2][k] + TENSOR[node2][node1][k]
-#
-    #    model.Add(S >= 2)
-
-    # 8) Miller-Tucker-Zemlin formulation # TODO: check this constraint
+    # 7) Miller-Tucker-Zemlin formulation # TODO: check this constraint
     u = []
     for k in range(COURIERS):
         u.append([])
