@@ -64,8 +64,6 @@ def main(args):
         sys.exit(1)
     instance = read_instance(args.instance)
 
-    print("Instance: ", args.instance)
-
     COURIERS = instance['m']
     ITEMS = instance['n']
     MAX_LOAD = instance['l']

@@ -42,14 +42,14 @@ constraint forall(i in 1..NODES, k in 1..COURIERS) (
 );
 
 % 6) All the items must be collected
-constraint forall(i in 2..NODES) (
-    sum([TENSOR[i,j,k] | j in 1..NODES, k in 1..COURIERS]) = 1
-);
+%constraint forall(i in 2..NODES) (
+%    sum([TENSOR[i,j,k] | j in 1..NODES, k in 1..COURIERS]) = 1
+%);
 
 % 7) Miller-Tucker-Zemlin formulation # TODO: check this constraint
-constraint forall(k in 1..COURIERS, i in 1..NODES, j in 1..NODES where i != j) (
-    u[j] - u[i] >= SIZE[j] - Q * (1 - TENSOR[i, j, k])
-);
+%constraint forall(k in 1..COURIERS, i in 1..NODES, j in 1..NODES where i != j) (
+%    u[j] - u[i] >= SIZE[j] - Q * (1 - TENSOR[i, j, k])
+%);
 
 % Objective function
 var int: arr_dist = sum([D[i,j]*TENSOR[i,j,k] | i in 1..NODES, j in 1..NODES, k in 1..COURIERS]);
