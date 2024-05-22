@@ -1,8 +1,7 @@
 import os, re, json, sys
 from ortools.sat.python import cp_model
-import numpy as np
 
-from utils import read_instance, parser_obj
+from utils import read_instance, parser_obj, check_symmetric, preprocess
 
 def path_sequence_cost(path, D):
     """
@@ -20,24 +19,6 @@ def path_sequence_cost(path, D):
         cost += D[i][j]
     return cost
 
-def check_symmetric(D):
-    """
-    Check if the distance matrix is symmetric
-    """
-    return np.allclose(D, D.T)
-
-def preprocess(D):
-    """
-    Preprocess the distance matrix
-    """
-    # load it as a numpy array
-    D = np.array(D)
-    D = np.insert(D, 0, D[-1], axis=0)
-    D = np.delete(D, -1, axis=0)
-    D = np.insert(D, 0, D[:, -1], axis=1)
-    D = np.delete(D, -1, axis=1)
-    return D
-
 def apply_constraints(model, TENSOR, NODES, COURIERS, SIZE, MAX_LOAD):
     # 1) Vehicle leaves node it enters
     for j in range(NODES):
@@ -54,7 +35,6 @@ def apply_constraints(model, TENSOR, NODES, COURIERS, SIZE, MAX_LOAD):
 
     # 4) Capacity constraints
     for k in range(COURIERS):
-        model.AddElement
         model.Add(sum(SIZE[j] * TENSOR[i][j][k] for j in range(1, NODES) for i in range(NODES)) <= MAX_LOAD[k])
 
     # 5) Remove self-loops
@@ -68,16 +48,15 @@ def apply_constraints(model, TENSOR, NODES, COURIERS, SIZE, MAX_LOAD):
 
     # 7) Miller-Tucker-Zemlin formulation # TODO: check this constraint
     u = []
-    for k in range(COURIERS):
-        u.append([])
-        for i in range(NODES):
-            u[k].append(model.NewIntVar(0, NODES, f'u_{k}_{i}'))
+    Q = max(MAX_LOAD)
+    for k in range(NODES):
+        u.append(model.NewIntVar(SIZE[k], Q, f'u_{k}'))
 
     for k in range(COURIERS):
         for i in range(1, NODES):
             for j in range(1, NODES):
                 if i != j:
-                    model.Add(u[k][i] - u[k][j] + 1 <= (NODES - 1)*(1 - TENSOR[i][j][k]))
+                    model.Add(u[j] - u[i] >= SIZE[j] - Q*(1 - TENSOR[i][j][k]))
 
 def main(args):
     if args.instance is None:
@@ -114,17 +93,18 @@ def main(args):
 
     # Objective function: minimize the maximum distance traveled by any vehicle
     arr_dist = []
-    if symm:
-        # We're only considering the upper triangular part of the matrix
-        for k in range(COURIERS):
-            arr_dist.append(sum(D[i][j] * TENSOR[i][j][k] for i in range(NODES) for j in range(i+1, NODES))) 
+    # if symm:
+    #     # We're only considering the upper triangular part of the matrix
+    #     for k in range(COURIERS):
+    #         arr_dist.append(sum(D[min(i, j)][max(i, j)] * TENSOR[i][j][k] for i in range(NODES) for j in range(NODES))) 
 
-        obj = model.NewIntVar(0, sum(sum(row[i:]) for i, row in enumerate(D)), 'max_distance')
-    else:
-        for k in range(COURIERS):
-            arr_dist.append(sum(D[i][j] * TENSOR[i][j][k] for i in range(NODES) for j in range(NODES)))
-        
-        obj = model.NewIntVar(0, sum(sum(row) for row in D), 'max_distance')
+    #     obj = model.NewIntVar(0, sum(sum(row) for row in D), 'max_distance')
+    # else:
+    for k in range(COURIERS):
+        arr_dist.append(sum(D[i][j] * TENSOR[i][j][k] for i in range(NODES) for j in range(NODES)))
+
+    obj = model.NewIntVar(0, sum(sum(row) for row in D), 'max_distance')
+            
     model.AddMaxEquality(obj, arr_dist)
 
     # Minimize the objective function
@@ -133,9 +113,10 @@ def main(args):
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = 300
     solver.parameters.log_search_progress = True
-    #solver.parameters.num_search_workers = 1
-    solver.parameters.linearization_level = 2
-    solver.parameters.symmetry_level = 1
+    solver.parameters.num_search_workers = 6
+    #solver.parameters.linearization_level = 2
+    #if symm:
+    #    solver.parameters.symmetry_level = 3
     status = solver.Solve(model)
 
     if status == cp_model.OPTIMAL or status == cp_model.FEASIBLE:

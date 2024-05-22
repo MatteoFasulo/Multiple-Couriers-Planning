@@ -1,6 +1,25 @@
 import argparse
+import numpy as np
 
 # Read an instance in .dat format and parse the content to a suitable data structure.
+
+def check_symmetric(D):
+    """
+    Check if the distance matrix is symmetric
+    """
+    return np.allclose(D, D.T)
+
+def preprocess(D):
+    """
+    Preprocess the distance matrix
+    """
+    # load it as a numpy array
+    D = np.array(D)
+    D = np.insert(D, 0, D[-1], axis=0)
+    D = np.delete(D, -1, axis=0)
+    D = np.insert(D, 0, D[:, -1], axis=1)
+    D = np.delete(D, -1, axis=1)
+    return D
 
 def read_instance(filename: str) -> dict:
     with open(filename, 'r') as file:
@@ -13,6 +32,21 @@ def read_instance(filename: str) -> dict:
         's': [int(x) for x in data[3].split()], # size of items
         'D': [[int(x) for x in line.split()] for line in data[4:]] # distance matrix
     }
+
+def convert_dat_to_dzn(filename: str):
+    instance = read_instance(filename)
+    with open(filename.replace('.dat', '.dzn'), 'w') as file:
+        file.write(f'COURIERS = {instance["m"]};\n')
+        file.write(f'ITEMS = {instance["n"]};\n')
+        file.write(f'MAX_LOAD = {instance["l"]};\n')
+        file.write(f'SIZE = {[0] + instance["s"]};\n') # Prepend 0 to the list of sizes to match the indexing
+        D = preprocess(instance['D']) # Preprocess the distance matrix
+        file.write('D = [|')
+        for row in D:
+            for elem in row:
+                file.write(f'{elem}, ')
+            file.write(f'\n|')
+        file.write('];\n')
 
 def parser_obj():
     parser  = argparse.ArgumentParser(
@@ -28,4 +62,9 @@ def parser_obj():
     return parser.parse_args()
 
 if __name__ == '__main__':
-    print(read_instance('Instances/inst03.dat'))
+    args = parser_obj()
+    if args.instance is not None:
+        convert_dat_to_dzn(args.instance)
+    else:
+        print('Error: missing instance')
+        exit(1)
