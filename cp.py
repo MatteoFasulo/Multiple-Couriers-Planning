@@ -1,9 +1,9 @@
-import sys
+import sys, datetime
 from dataclasses import dataclass
 from minizinc import Instance, Model, Solver
 import numpy as np
 
-from utils import read_instance, parser_obj, check_symmetric, preprocess
+from utils import read_instance, parser_obj, path_sequence
 
 @dataclass
 class MCPOutput:
@@ -12,29 +12,50 @@ class MCPOutput:
     TENSOR: np.ndarray
 
 def main():
-    gecode = Solver.lookup("gecode")
+    solver = Solver.lookup("chuffed")
 
     model = Model("mcp.mzn")
-    model.output_type = MCPOutput
+    #model.output_type = MCPOutput
 
-    instance = Instance(gecode, model)
+    instance = Instance(solver, model)
 
     args = parser_obj()
     if args.instance is None:
         print('Error: missing instance')
         sys.exit(1)
 
+    instance.add_file(args.instance.replace('dat', 'dzn'))
     problem = read_instance(args.instance)
 
-    instance["COURIERS"] = problem['m']
-    instance["ITEMS"] = problem['n']
-    instance["MAX_LOAD"] = problem['l']
-    instance["SIZE"] = [0] + problem['s']
-    instance["D"] = problem['D']
-
     # Find and print all possible solutions
-    result = instance.solve().solution
-    print(result)
+    COURIERS = problem["m"]
+    NODES = problem["n"] + 1
+
+    result = instance.solve(timeout=datetime.timedelta(seconds=10))
+    if not result:
+        print('No solution found')
+        sys.exit(1)
+    
+    result = result.solution
+
+    TENSOR = np.array(result.TENSOR).reshape(NODES, NODES, COURIERS)
+
+    all_paths = []
+    for k in range(COURIERS):
+        path = []
+        for i in range(NODES):
+            for j in range(NODES):
+                if TENSOR[i][j][k] == 1:
+                    path.append((i,j))
+        print(path)
+        path_sequence(path)
+        print(path)
+        path = [x[1] for x in path[:-1]]
+        print(path)
+        print(f'Courier: {k}\tPath sequence: {path}')
+        print('\n')
+        all_paths.append(path)
+    print(all_paths)
 
 if __name__ == '__main__':
     main()

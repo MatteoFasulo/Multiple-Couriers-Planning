@@ -33,6 +33,26 @@ def read_instance(filename: str) -> dict:
         'D': [[int(x) for x in line.split()] for line in data[4:]] # distance matrix
     }
 
+def path_sequence(path, D=None): # TODO: fix this function using OrderedDict with move_to_end
+    d = dict()
+    for i,j in path:
+        d[i] = (i,j)
+    sorted_path = []
+    sorted_path.append(d[0])
+    tail = d[0][1]
+    while tail != 0:
+        sorted_path.append(d[tail])
+        tail = d[tail][1]
+    path = sorted_path
+
+    if D is None:
+        return
+
+    cost = 0
+    for i,j in path:
+        cost += D[i][j]
+    return cost
+
 def convert_dat_to_dzn(filename: str):
     instance = read_instance(filename)
     with open(filename.replace('.dat', '.dzn'), 'w') as file:

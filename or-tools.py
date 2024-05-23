@@ -1,23 +1,7 @@
 import os, re, json, sys
 from ortools.sat.python import cp_model
 
-from utils import read_instance, parser_obj, check_symmetric, preprocess
-
-def path_sequence_cost(path, D):
-    """
-    Calculate the cost of a path sequence
-    """
-    for idx, (i,j) in enumerate(path[:-1]):
-        if j == path[idx+1][0]:
-            continue
-        for pos in range(idx+1, len(path)):
-            if j == path[pos][0]:
-                path[idx+1], path[pos] = path[pos], path[idx+1]
-                break
-    cost = 0
-    for i,j in path:
-        cost += D[i][j]
-    return cost
+from utils import read_instance, parser_obj, check_symmetric, preprocess, path_sequence
 
 def apply_constraints(model, TENSOR, NODES, COURIERS, SIZE, MAX_LOAD):
     # 1) Vehicle leaves node it enters
@@ -127,7 +111,7 @@ def main(args):
                 for j in range(NODES):
                     if solver.Value(TENSOR[i][j][k]) == 1:
                         path.append((i,j))
-            cost = path_sequence_cost(path, D)
+            cost = path_sequence(path, D)
             path = [x[1] for x in path[:-1]]
             print(f'Courier: {k}\tPath sequence: {path}\t cost: {cost}')
             print('\n')

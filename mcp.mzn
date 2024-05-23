@@ -16,7 +16,7 @@ array[1..NODES, 1..NODES, 1..COURIERS] of var 0..1: TENSOR;
 % Constraints
 % 1) Vehicle leaves node it enters
 constraint forall(j in 1..NODES, k in 1..COURIERS) (
-    sum(i in 1..NODES) (TENSOR[i,j,k]) = sum(i in 1..NODES) (TENSOR[j,i,k])
+    sum([TENSOR[i,j,k] | i in 1..NODES]) = sum([TENSOR[j,i,k] | i in 1..NODES])
 );
 
 % 2) Each node is entered just once by any vehicle
@@ -42,16 +42,22 @@ constraint forall(i in 1..NODES, k in 1..COURIERS) (
 );
 
 % 6) All the items must be collected
-%constraint forall(i in 2..NODES) (
-%    sum([TENSOR[i,j,k] | j in 1..NODES, k in 1..COURIERS]) = 1
-%);
+constraint forall(i in 2..NODES) (
+    sum([TENSOR[i,j,k] | j in 1..NODES, k in 1..COURIERS]) = 1
+);
 
 % 7) Miller-Tucker-Zemlin formulation # TODO: check this constraint
-%constraint forall(k in 1..COURIERS, i in 1..NODES, j in 1..NODES where i != j) (
-%    u[j] - u[i] >= SIZE[j] - Q * (1 - TENSOR[i, j, k])
-%);
+constraint forall(k in 1..COURIERS, i in 2..NODES, j in 2..NODES where i != j) (
+    u[j] - u[i] >= SIZE[j] - Q * (1 - TENSOR[i, j, k])
+);
 
 % Objective function
-var int: arr_dist = sum([D[i,j]*TENSOR[i,j,k] | i in 1..NODES, j in 1..NODES, k in 1..COURIERS]);
+var int: arr_dist = min([sum([D[i,j]*TENSOR[i,j,k] | i in 1..NODES, j in 1..NODES]) | k in 1..COURIERS]);
 
 solve minimize arr_dist;
+
+
+output [
+    "arr_dist: \(arr_dist)\n",
+    "TENSOR: \(TENSOR)\n"
+];
