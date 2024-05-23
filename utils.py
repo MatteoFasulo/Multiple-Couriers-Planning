@@ -34,20 +34,21 @@ def read_instance(filename: str) -> dict:
     }
 
 def path_sequence(path, D=None): # TODO: fix this function using OrderedDict with move_to_end
-    d = dict()
-    for i,j in path:
-        d[i] = (i,j)
-    sorted_path = []
-    sorted_path.append(d[0])
-    tail = d[0][1]
-    while tail != 0:
-        sorted_path.append(d[tail])
-        tail = d[tail][1]
-    path = sorted_path
+    """
+    Calculate the cost of a path sequence
+    """
+    for idx in range(len(path) - 1):
+        i, j = path[idx]
+        if j == path[idx+1][0]:
+            continue
+        for pos in range(idx+1, len(path)):
+            if j == path[pos][0]:
+                path[idx+1], path[pos] = path[pos], path[idx+1]
+                break
 
     if D is None:
         return
-
+        
     cost = 0
     for i,j in path:
         cost += D[i][j]
