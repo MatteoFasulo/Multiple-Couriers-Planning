@@ -67,14 +67,9 @@ def main(args):
     D = preprocess(D)
 
     s = Optimize()
+    s.set("timeout", 300_000)
 
     TENSOR = [[[Bool(f'TENSOR_{i}_{j}_{k}') for k in range(COURIERS)] for j in range(NODES)] for i in range(NODES)]
-
-    # SMT_D = [[Int(f"D_{i}_{j}") for j in range(NODES)] for i in range(NODES)]
-    #
-    # for i in range(NODES):
-    #     for j in range(NODES):
-    #         s.add(SMT_D[i][j] == D[i][j])
 
     # 1) Vehicle leaves node it enters
     for j in range(NODES):
@@ -98,7 +93,6 @@ def main(args):
         for k in range(COURIERS):
             s.add(Not(TENSOR[i][i][k]))
 
-
     # 6) Miller-Tucker-Zemlin formulation
     u = [Int(f'u_{i}') for i in range(NODES)]
     Q = max(MAX_LOAD)
@@ -112,7 +106,6 @@ def main(args):
             for j in range(1, NODES):
                 if i != j:
                     s.add(u[j] - u[i] >= SIZE[j] + If(TENSOR[i][j][k], 0, -Q))
-                    # s.add(u[j] - u[i] >= SIZE[j] - Q * (1 - TENSOR[i][j][k]))
 
     arr_dist = []
     for k in range(COURIERS):
@@ -121,41 +114,39 @@ def main(args):
     obj = max_z3(arr_dist)
     s.minimize(obj)
 
-    if s.check() == sat:
-        model = s.model()
-        all_paths = []
-        max_cost = 0
-        for k in range(COURIERS):
-            path = []
-            for i in range(NODES):
-                for j in range(NODES):
-                    if model[TENSOR[i][j][k]]:
-                        path.append((i, j))
-            cost = path_sequence_cost(path, D)
+    res = s.check()
+    model = s.model()
 
-            if cost > max_cost:
-                max_cost = cost
+    all_paths = []
+    max_cost = 0
+    for k in range(COURIERS):
+        path = []
+        for i in range(NODES):
+            for j in range(NODES):
+                if model[TENSOR[i][j][k]]:
+                    path.append((i, j))
+        cost = path_sequence_cost(path, D)
 
-            path = [x[1] for x in path[:-1]]
-            print(f'Courier: {k}\tPath sequence: {path}\t cost: {cost}')
-            print('\n')
-            all_paths.append(path)
+        if cost > max_cost:
+            max_cost = cost
 
-            # Extract digit from string
-            num = int(re.search('\d+', args.instance).group())
-            # Write the results to a json file and if the same key is present, it will be overwritten
-            with open(f'{os.getcwd()}{os.sep}res{os.sep}SAT{os.sep}{num}.json', 'w') as file:
-                json.dump({
-                    'gecode': {  # TODO: change this, just to check the solution
-                        'time': int(time.time() - start),
-                        'optimal': True,
-                        'obj': int(max_cost),
-                        'sol': all_paths
-                    }
-                }, file, indent=4)
+        path = [x[1] for x in path[:-1]]
+        print(f'Courier: {k}\tPath sequence: {path}\t cost: {cost}')
+        print('\n')
+        all_paths.append(path)
 
-    else:
-        print('No solution found')
+        # Extract digit from string
+        num = int(re.search('\d+', args.instance).group())
+        # Write the results to a json file and if the same key is present, it will be overwritten
+        with open(f'{os.getcwd()}{os.sep}res{os.sep}SAT{os.sep}{num}.json', 'w') as file:
+            json.dump({
+                'z3': {
+                    'time': int(time.time() - start),
+                    'optimal': res == sat,
+                    'obj': int(max_cost),
+                    'sol': all_paths
+                }
+            }, file, indent=4)
 
 
 if __name__ == '__main__':
