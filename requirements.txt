@@ -1,3 +1,4 @@
 ortools
 z3-solver
 matplotlib
+minizinc[dzn]

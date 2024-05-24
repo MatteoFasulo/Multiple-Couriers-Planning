@@ -1,3 +1,6 @@
+import json
+import os
+import re
 import argparse
 import numpy as np
 
@@ -7,6 +10,10 @@ def check_symmetric(D):
     """
     Check if the distance matrix is symmetric
     """
+    # Convert the distance matrix to a numpy array if it is not
+    if not isinstance(D, np.ndarray):
+        D = np.array(D)
+
     return np.allclose(D, D.T)
 
 def preprocess(D):
@@ -33,6 +40,27 @@ def read_instance(filename: str) -> dict:
         'D': [[int(x) for x in line.split()] for line in data[4:]] # distance matrix
     }
 
+def path_sequence(path, D=None): # TODO: fix this function using OrderedDict with move_to_end
+    """
+    Calculate the cost of a path sequence
+    """
+    for idx in range(len(path) - 1):
+        i, j = path[idx]
+        if j == path[idx+1][0]:
+            continue
+        for pos in range(idx+1, len(path)):
+            if j == path[pos][0]:
+                path[idx+1], path[pos] = path[pos], path[idx+1]
+                break
+
+    if D is None:
+        return
+        
+    cost = 0
+    for i,j in path:
+        cost += D[i][j]
+    return cost
+
 def convert_dat_to_dzn(filename: str):
     instance = read_instance(filename)
     with open(filename.replace('.dat', '.dzn'), 'w') as file:
@@ -47,6 +75,53 @@ def convert_dat_to_dzn(filename: str):
                 file.write(f'{elem}, ')
             file.write(f'\n|')
         file.write('];\n')
+
+def write_json_solution(instance: str, folder: str, solver: str, time: int, optimal: bool, obj: int, sol: list):
+    # Extract digit from string
+    num = int(re.search('\d+', instance).group())
+
+    # read the json file as a dictionary 
+    if os.path.exists(f'{os.getcwd()}{os.sep}res{os.sep}{folder}{os.sep}{num}.json'):
+        with open(f'{os.getcwd()}{os.sep}res{os.sep}{folder}{os.sep}{num}.json', 'r') as file:
+            data = json.load(file)
+        
+        # Check if the same solver is present in the json file
+        if solver in data:
+            # Check if the time is lower than the previous one
+            if time < data[solver]['time'] or obj <= data[solver]['obj']:
+                with open(f'{os.getcwd()}{os.sep}res{os.sep}{folder}{os.sep}{num}.json', 'w') as file:
+                    json.dump({
+                        solver:{ 
+                            'time': time,
+                            'optimal': optimal,
+                            'obj': obj,
+                            'sol': sol
+                        }
+                    }, file, indent=3)
+            return False
+        else:
+            data[solver] = {
+                'time': time,
+                'optimal': optimal,
+                'obj': obj,
+                'sol': sol
+            }
+            with open(f'{os.getcwd()}{os.sep}res{os.sep}{folder}{os.sep}{num}.json', 'w') as file:
+                json.dump(data, file, indent=3)
+
+    # Create a new json file, first entry for that instance
+    else:
+        with open(f'{os.getcwd()}{os.sep}res{os.sep}{folder}{os.sep}{num}.json', 'w') as file:
+            json.dump({
+                solver: {
+                    'time': time,
+                    'optimal': optimal,
+                    'obj': obj,
+                    'sol': sol
+                }
+            }, file, indent=3)
+
+    return True
 
 def parser_obj():
     parser  = argparse.ArgumentParser(
