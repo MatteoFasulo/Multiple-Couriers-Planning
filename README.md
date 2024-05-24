@@ -2,10 +2,10 @@
 
 Multiple Couriers Planning (MCP)
 
-### Run CP (OR)
+### Run MiniZinc (with Python binding)
 
 ```python
-python cp_or.py --i Instances/inst01.dat
+python cp.py --i Instances/inst01.dat
 ```
 
 ### Run SMT
