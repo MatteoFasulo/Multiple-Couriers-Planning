@@ -90,7 +90,7 @@ def main(args):
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = 300
     solver.parameters.log_search_progress = True
-    solver.parameters.num_search_workers = 6
+    solver.parameters.num_search_workers = 1
     #solver.parameters.linearization_level = 2
     #if symm:
     #    solver.parameters.symmetry_level = 3
@@ -112,16 +112,18 @@ def main(args):
             print('\n')
             all_paths.append(path)
 
-        write_json_solution(args.instance, 'SAT', 'ortools', solver.WallTime(), solver.StatusName() == 'OPTIMAL', solver.ObjectiveValue(), all_paths)
+        write_json_solution(args.instance, 'SAT', 'ortools', solver.WallTime(), solver.StatusName() == 'OPTIMAL', int(solver.ObjectiveValue()), all_paths)
 
     else:
         print('No solution found')
+        return
 
 if __name__ == '__main__':
     args = parser_obj()
     if args.runall:
         for instance in sorted(os.listdir('Instances'), key=lambda x: int(re.search('\d+', x).group())):
-            args.instance = f'Instances{os.sep}{instance}'
-            main(args)
+            if instance.endswith('.dat'):
+                args.instance = f'Instances{os.sep}{instance}'
+                main(args)
     else:
         main(args)

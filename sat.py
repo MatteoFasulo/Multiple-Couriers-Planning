@@ -1,13 +1,7 @@
-import os, re, json, sys
-import time
+import os, re, json, sys, time
 from itertools import combinations
-
-from ortools.sat.python import cp_model
 from z3 import *
-import numpy as np
-
-from utils import read_instance, parser_obj, check_symmetric, preprocess
-
+from utils import read_instance, parser_obj, check_symmetric, preprocess, path_sequence, write_json_solution
 
 def at_least_one(bool_vars):
     return Or(bool_vars)
@@ -29,31 +23,13 @@ def max_z3(vars):
     return max_value
 
 
-def path_sequence_cost(path, D):
-    """
-    Calculate the cost of a path sequence
-    """
-    for idx in range(len(path) - 1):
-        i, j = path[idx]
-        if j == path[idx+1][0]:
-            continue
-        for pos in range(idx+1, len(path)):
-            if j == path[pos][0]:
-                path[idx+1], path[pos] = path[pos], path[idx+1]
-                break
-    cost = 0
-    for i, j in path:
-        cost += D[i][j]
-    return cost
-
-
 def main(args):
     if args.instance is None:
         print('Error: missing instance')
         sys.exit(1)
     instance = read_instance(args.instance)
 
-    print("Instance: ", instance)
+    #print("Instance: ", instance)
 
     COURIERS = instance['m']
     ITEMS = instance['n']
@@ -112,49 +88,44 @@ def main(args):
         arr_dist.append(Sum([If(TENSOR[i][j][k], int(D[i][j]), 0) for i in range(NODES) for j in range(NODES)]))
 
     obj = max_z3(arr_dist)
-    s.minimize(obj)
+    min_obj_val = s.minimize(obj)
 
-    res = s.check()
-    model = s.model()
+    outcome = s.check()
+    if outcome != sat:
+        print('No solution found')
+        return
 
-    all_paths = []
-    max_cost = 0
-    for k in range(COURIERS):
-        path = []
-        for i in range(NODES):
-            for j in range(NODES):
-                if model[TENSOR[i][j][k]]:
-                    path.append((i, j))
-        cost = path_sequence_cost(path, D)
+    else:
+        model = s.model()
 
-        if cost > max_cost:
-            max_cost = cost
+        all_paths = []
+        max_cost = 0
+        for k in range(COURIERS):
+            path = []
+            for i in range(NODES):
+                for j in range(NODES):
+                    if model[TENSOR[i][j][k]]:
+                        path.append((i, j))
+            cost = path_sequence(path, D)
 
-        path = [x[1] for x in path[:-1]]
-        print(f'Courier: {k}\tPath sequence: {path}\t cost: {cost}')
-        print('\n')
-        all_paths.append(path)
+            if cost > max_cost:
+                max_cost = cost
 
-        # Extract digit from string
-        num = int(re.search('\d+', args.instance).group())
-        # Write the results to a json file and if the same key is present, it will be overwritten
-        with open(f'{os.getcwd()}{os.sep}res{os.sep}SAT{os.sep}{num}.json', 'w') as file:
-            json.dump({
-                'z3': {
-                    'time': int(time.time() - start),
-                    'optimal': res == sat,
-                    'obj': int(max_cost),
-                    'sol': all_paths
-                }
-            }, file, indent=4)
+            path = [x[1] for x in path[:-1]]
+            print(f'Courier: {k}\tPath sequence: {path}\t cost: {cost}')
+            print('\n')
+            all_paths.append(path)
+
+            write_json_solution(args.instance, 'SAT', 'z3', s.statistics().get_key_value('time'), str(outcome) == 'sat', min_obj_val.value().as_long(), all_paths)
 
 
 if __name__ == '__main__':
     args = parser_obj()
     if args.runall:
         for instance in sorted(os.listdir('Instances'), key=lambda x: int(re.search('\d+', x).group())):
-            args.instance = f'Instances{os.sep}{instance}'
-            main(args)
+            if instance.endswith('.dat'):
+                args.instance = f'Instances{os.sep}{instance}'
+                main(args)
     else:
         main(args)
 

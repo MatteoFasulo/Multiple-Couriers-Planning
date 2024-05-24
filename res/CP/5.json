@@ -1,6 +1,6 @@
 {
-   "ortools": {
-      "time": 0.003260236,
+   "chuffed": {
+      "time": 0.003,
       "optimal": true,
       "obj": 206,
       "sol": [

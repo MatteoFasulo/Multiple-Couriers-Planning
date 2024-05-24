@@ -1,6 +1,6 @@
 {
-   "gecode": {
-      "time": 0.144,
+   "z3": {
+      "time": 6.271,
       "optimal": true,
       "obj": 14,
       "sol": [
@@ -16,10 +16,10 @@
          ]
       ]
    },
-   "chuffed": {
-      "time": 0.012,
+   "ortools": {
+      "time": 0.13893106100000002,
       "optimal": true,
-      "obj": 14,
+      "obj": 14.0,
       "sol": [
          [
             1,

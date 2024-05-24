@@ -1,15 +1,14 @@
-import sys, datetime
+import os, re, sys, datetime
 from minizinc import Instance, Model, Solver
 import numpy as np
 
 from utils import read_instance, parser_obj, path_sequence, check_symmetric, write_json_solution
 
-def main():
+def main(args):
     # Define the solver to use
     solver = Solver.lookup("chuffed")
 
     # Get the args from CLI
-    args = parser_obj()
     if args.instance is None:
         print('Error: missing instance')
         sys.exit(1)
@@ -68,7 +67,7 @@ def main():
     # Check if a solution has been found
     if not result:
         print('No solution found')
-        sys.exit(1)
+        return
 
     # Convert the result to a numpy array and reshape it
     TENSOR = np.array(result.solution.TENSOR).reshape(NODES, NODES, COURIERS)
@@ -87,7 +86,14 @@ def main():
         print('\n')
         all_paths.append(path)
     
-    write_json_solution(args.instance, 'SAT', solver.name.lower(), result.statistics['time'].total_seconds(), str(result.status) == 'OPTIMAL_SOLUTION', result.solution.objective, all_paths)
+    write_json_solution(args.instance, 'CP', solver.name.lower(), result.statistics['time'].total_seconds(), str(result.status) == 'OPTIMAL_SOLUTION', result.solution.objective, all_paths)
 
 if __name__ == '__main__':
-    main()
+    args = parser_obj()
+    if args.runall:
+        for instance in sorted(os.listdir('Instances'), key=lambda x: int(re.search('\d+', x).group())):
+            if instance.endswith('.dat'):
+                args.instance = f'Instances{os.sep}{instance}'
+                main(args)
+    else:
+        main(args)
