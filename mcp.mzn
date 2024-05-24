@@ -7,11 +7,9 @@ int: COURIERS;
 array[1..NODES] of int: SIZE;
 array[1..NODES, 1..NODES] of int: D;
 array[1..COURIERS] of int: MAX_LOAD;
-var int: Q = max(MAX_LOAD);
-array[1..NODES] of var int: u;
 
 % Decision variables
-array[1..NODES, 1..NODES, 1..COURIERS] of var 0..1: TENSOR;
+array[1..NODES, 1..NODES, 1..COURIERS] of var bool: TENSOR;
 
 % Constraints
 % 1) Vehicle leaves node it enters
@@ -32,7 +30,7 @@ constraint forall(k in 1..COURIERS) (
 
 % 4) Capacity constraints
 constraint forall(k in 1..COURIERS) (
-    sum([SIZE[j]*TENSOR[i,j,k] | i in 1..NODES, j in 2..NODES]) <= MAX_LOAD[k]
+    sum([SIZE[j]*TENSOR[i,j,k] | j in 2..NODES, i in 1..NODES]) <= MAX_LOAD[k]
 );
 
 % 5) Remove self-loops
@@ -41,23 +39,28 @@ constraint forall(i in 1..NODES, k in 1..COURIERS) (
     TENSOR[i,i,k] = 0
 );
 
-% 6) All the items must be collected
-constraint forall(i in 2..NODES) (
-    sum([TENSOR[i,j,k] | j in 1..NODES, k in 1..COURIERS]) = 1
+% 6) Miller-Tucker-Zemlin formulation # TODO: check this constraint
+var int: Q = max(MAX_LOAD);
+array[1..NODES] of var int: u;
+% Assigning the domain to each decision variable in the array
+constraint forall(i in 1..NODES) (
+    u[i] in SIZE[i]..Q
 );
 
-% 7) Miller-Tucker-Zemlin formulation # TODO: check this constraint
 constraint forall(k in 1..COURIERS, i in 2..NODES, j in 2..NODES where i != j) (
-    u[j] - u[i] >= SIZE[j] - Q * (1 - TENSOR[i, j, k])
+    u[j] - u[i] >= SIZE[j] - Q *(1 - TENSOR[i,j,k])
 );
 
-% Objective function
-var int: arr_dist = min([sum([D[i,j]*TENSOR[i,j,k] | i in 1..NODES, j in 1..NODES]) | k in 1..COURIERS]);
+% Calculate the total distance traveled by each courier
+array[1..COURIERS] of var int: arr_dist = [sum(i in 1..NODES, j in 1..NODES)(D[i,j] * TENSOR[i,j,k]) | k in 1..COURIERS];
 
-solve minimize arr_dist;
+% Objective function: minimize the maximum distance traveled by any vehicle
+var 0..sum([sum(D[i,..]) | i in 1..NODES]) : obj;
 
+constraint (
+    obj == max(arr_dist)
+);
 
 output [
-    "arr_dist: \(arr_dist)\n",
-    "TENSOR: \(TENSOR)\n"
+    "arr_dist: \(arr_dist)\n"
 ];

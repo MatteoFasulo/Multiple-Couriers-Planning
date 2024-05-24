@@ -1,7 +1,9 @@
-import os, re, json, sys
+import os
+import re
+import sys
 from ortools.sat.python import cp_model
 
-from utils import read_instance, parser_obj, check_symmetric, preprocess, path_sequence
+from utils import read_instance, parser_obj, check_symmetric, preprocess, path_sequence, write_json_solution
 
 def apply_constraints(model, TENSOR, NODES, COURIERS, SIZE, MAX_LOAD):
     # 1) Vehicle leaves node it enters
@@ -27,14 +29,14 @@ def apply_constraints(model, TENSOR, NODES, COURIERS, SIZE, MAX_LOAD):
             model.Add(TENSOR[i][i][k] == 0)
 
     # 6) All the items must be collected
-    for i in range(1, NODES):
-        model.add(sum(TENSOR[i][j][k] for j in range(NODES) for k in range(COURIERS)) == 1)
+    #for i in range(1, NODES):
+    #    model.add(sum(TENSOR[i][j][k] for j in range(NODES) for k in range(COURIERS)) == 1)
 
     # 7) Miller-Tucker-Zemlin formulation # TODO: check this constraint
     u = []
     Q = max(MAX_LOAD)
-    for k in range(NODES):
-        u.append(model.NewIntVar(SIZE[k], Q, f'u_{k}'))
+    for i in range(NODES):
+        u.append(model.NewIntVar(SIZE[i], Q, f'u_{i}'))
 
     for k in range(COURIERS):
         for i in range(1, NODES):
@@ -75,13 +77,6 @@ def main(args):
 
     # Objective function: minimize the maximum distance traveled by any vehicle
     arr_dist = []
-    # if symm:
-    #     # We're only considering the upper triangular part of the matrix
-    #     for k in range(COURIERS):
-    #         arr_dist.append(sum(D[min(i, j)][max(i, j)] * TENSOR[i][j][k] for i in range(NODES) for j in range(NODES))) 
-
-    #     obj = model.NewIntVar(0, sum(sum(row) for row in D), 'max_distance')
-    # else:
     for k in range(COURIERS):
         arr_dist.append(sum(D[i][j] * TENSOR[i][j][k] for i in range(NODES) for j in range(NODES)))
 
@@ -117,18 +112,7 @@ def main(args):
             print('\n')
             all_paths.append(path)
 
-        # Extract digit from string
-        num = int(re.search('\d+', args.instance).group())
-        # Write the results to a json file and if the same key is present, it will be overwritten
-        with open(f'{os.getcwd()}{os.sep}res{os.sep}SAT{os.sep}{num}.json', 'w') as file:
-            json.dump({
-                'gecode':{ #TODO: change this, just to check the solution
-                    'time': int(solver.WallTime()),
-                    'optimal': status == cp_model.OPTIMAL,
-                    'obj': int(solver.ObjectiveValue()),
-                    'sol': all_paths
-                }
-            }, file, indent=4)
+        write_json_solution(args.instance, 'SAT', 'ortools', solver.WallTime(), solver.StatusName() == 'OPTIMAL', solver.ObjectiveValue(), all_paths)
 
     else:
         print('No solution found')
