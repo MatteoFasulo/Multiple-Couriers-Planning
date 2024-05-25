@@ -38,8 +38,6 @@ def main(args):
     D = instance['D']
     NODES = ITEMS + 1
 
-    start = time.time()
-
     D = preprocess(D)
 
     s = Optimize()
@@ -83,6 +81,21 @@ def main(args):
                 if i != j:
                     s.add(u[j] - u[i] >= SIZE[j] + If(TENSOR[i][j][k], 0, -Q))
 
+    # 7) size symmetry breaking:
+    for k1 in range(COURIERS):
+        for k2 in range(k1 + 1, COURIERS):
+            if SIZE[k1] == SIZE[k2]:
+                for i in range(NODES):
+                    for j in range(i + 1, NODES):
+                        s.add(Not(And(TENSOR[0][j][k1], TENSOR[0][i][k2])))
+
+    # 8) Path symmetry breaking for symmetric matrix only
+    if check_symmetric(D):
+        for k in range(COURIERS):
+            for i in range(NODES):
+                for j in range(i + 1, NODES):
+                    s.add(Not(And(TENSOR[0][j][k], TENSOR[i][0][k])))
+
     arr_dist = []
     for k in range(COURIERS):
         arr_dist.append(Sum([If(TENSOR[i][j][k], int(D[i][j]), 0) for i in range(NODES) for j in range(NODES)]))
@@ -116,7 +129,7 @@ def main(args):
             print('\n')
             all_paths.append(path)
 
-            write_json_solution(args.instance, 'SAT', 'z3', s.statistics().get_key_value('time'), str(outcome) == 'sat', min_obj_val.value().as_long(), all_paths)
+        write_json_solution(args.instance, 'SAT', 'z3', s.statistics().get_key_value('time'), str(outcome) == 'sat', min_obj_val.value().as_long(), all_paths)
 
 
 if __name__ == '__main__':
