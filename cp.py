@@ -30,8 +30,8 @@ def main(args):
     if D_symmetric:
         model.add_string(
             """
-            constraint forall(i in 1..NODES, j in 1..NODES, k in 1..COURIERS) (
-                (TENSOR[1,i,k] /\ TENSOR[j,1,k]) -> i <= j
+            constraint forall(k in 1..COURIERS, i in 1..NODES, j in i+1..NODES) (
+                not(TENSOR[0,j,k] /\ TENSOR[i,0,k])
             );
             """
         )

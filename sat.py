@@ -1,18 +1,30 @@
-import os, re, json, sys, time
+import os, re, sys
 from itertools import combinations
 from z3 import *
-from utils import read_instance, parser_obj, check_symmetric, preprocess, path_sequence, write_json_solution
+from utils import read_instance, parser_obj, check_symmetric, preprocess, path_sequence, write_json_solution, lower_bound
 
-def at_least_one(bool_vars):
+# Naive encoding
+def at_least_one_np(bool_vars):
     return Or(bool_vars)
 
+def at_most_one_np(bool_vars):
+    return And([Not(And(pair[0], pair[1])) for pair in combinations(bool_vars, 2)])
 
-def at_most_one(bool_vars):
-    return [Not(And(pair[0], pair[1])) for pair in combinations(bool_vars, 2)]
+def exactly_one_np(bool_vars, name = ""):
+    return And(at_least_one_np(bool_vars), at_most_one_np(bool_vars, name))
 
+# Heule encoding
+def at_least_one_he(bool_vars):
+    return at_least_one_np(bool_vars)
 
-def exactly_one(bool_vars):
-    return at_most_one(bool_vars) + [at_least_one(bool_vars)]
+def at_most_one_he(bool_vars, name):
+    if len(bool_vars) <= 4:
+        return [Not(And(pair[0], pair[1])) for pair in combinations(bool_vars, 2)]
+    y = Bool(f"y_{name}")
+    return And(And(at_most_one_np(bool_vars[:3] + [y])), And(at_most_one_he(bool_vars[3:] + [Not(y)], name+"_")))
+
+def exactly_one_he(bool_vars, name):
+    return And(at_most_one_he(bool_vars, name), at_least_one_he(bool_vars))
 
 
 def max_z3(vars):
@@ -39,35 +51,37 @@ def main(args):
     NODES = ITEMS + 1
 
     D = preprocess(D)
+    symm = check_symmetric(D)
+    lower_bnd = lower_bound(D)
 
     s = Optimize()
     s.set("timeout", 300_000)
 
-    TENSOR = [[[Bool(f'TENSOR_{i}_{j}_{k}') for k in range(COURIERS)] for j in range(NODES)] for i in range(NODES)]
+    TENSOR = [[[Bool(f'x{i}_{j}_{k}') for k in range(COURIERS)] for j in range(NODES)] for i in range(NODES)]
 
     # 1) Vehicle leaves node it enters
     for j in range(NODES):
         for k in range(COURIERS):
-            s.add(Sum([If(TENSOR[i][j][k], 1, 0) for i in range(NODES)]) == Sum([If(TENSOR[j][i][k], 1, 0) for i in range(NODES)]))
+            s.add(Sum([TENSOR[i][j][k] for i in range(NODES)]) == Sum([TENSOR[j][i][k] for i in range(NODES)]))
 
     # 2) Each node is entered just once by any vehicle
     for j in range(1, NODES):
-        s.add(exactly_one([TENSOR[i][j][k] for i in range(NODES) for k in range(COURIERS)]))
+        s.add(exactly_one_he([TENSOR[i][j][k] for i in range(NODES) for k in range(COURIERS)], f'valid_node_{j}'))
 
-    # 3) Depot is entered and leaved once by every courier
+    # 3) Every vehicle starts from the depot and ends at the depot
     for k in range(COURIERS):
-        s.add(exactly_one([TENSOR[0][i][k] for i in range(NODES)]))
+        s.add(exactly_one_he([TENSOR[0][j][k] for j in range(1, NODES)], f'valid_depot_{k}'))
 
     # 4) Capacity constraints
     for k in range(COURIERS):
-        s.add(Sum([SIZE[j] * If(TENSOR[i][j][k], 1, 0) for j in range(1, NODES) for i in range(NODES)]) <= MAX_LOAD[k])
+        s.add(Sum([SIZE[j] * TENSOR[i][j][k] for j in range(1, NODES) for i in range(NODES)]) <= MAX_LOAD[k])
 
     # 5) Remove self-loops
     for i in range(NODES):
         for k in range(COURIERS):
             s.add(Not(TENSOR[i][i][k]))
 
-    # 6) Miller-Tucker-Zemlin formulation
+    # 6) Miller-Tucker-Zemlin formulation (MTZ)
     u = [Int(f'u_{i}') for i in range(NODES)]
     Q = max(MAX_LOAD)
 
@@ -90,7 +104,7 @@ def main(args):
                         s.add(Not(And(TENSOR[0][j][k1], TENSOR[0][i][k2])))
 
     # 8) Path symmetry breaking for symmetric matrix only
-    if check_symmetric(D):
+    if symm:
         for k in range(COURIERS):
             for i in range(NODES):
                 for j in range(i + 1, NODES):
@@ -100,7 +114,11 @@ def main(args):
     for k in range(COURIERS):
         arr_dist.append(Sum([If(TENSOR[i][j][k], int(D[i][j]), 0) for i in range(NODES) for j in range(NODES)]))
 
-    obj = max_z3(arr_dist)
+    obj = Int('max_distance')
+    #s.add(And(obj >= lower_bnd, obj <= sum([sum(row) for row in D])))
+
+    s.add(obj == max_z3(arr_dist))
+
     min_obj_val = s.minimize(obj)
 
     outcome = s.check()

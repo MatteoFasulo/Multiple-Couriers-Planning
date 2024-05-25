@@ -16,6 +16,12 @@ def check_symmetric(D):
 
     return np.allclose(D, D.T)
 
+def lower_bound(D):
+    # Replace diagonal with infinity (or any other suitable value)
+    D_copy = np.copy(D)
+    np.fill_diagonal(D_copy, 1e9)  # Replace NaN with infinity
+    return D_copy.min(axis=0).sum()
+
 def preprocess(D):
     """
     Preprocess the distance matrix
@@ -88,16 +94,15 @@ def write_json_solution(instance: str, folder: str, solver: str, time: int, opti
         # Check if the same solver is present in the json file
         if solver in data:
             # Check if the time is lower than the previous one
-            if time < data[solver]['time'] or obj <= data[solver]['obj']:
-                with open(f'{os.getcwd()}{os.sep}res{os.sep}{folder}{os.sep}{num}.json', 'w') as file:
-                    json.dump({
-                        solver:{ 
-                            'time': time,
-                            'optimal': optimal,
-                            'obj': obj,
-                            'sol': sol
-                        }
-                    }, file, indent=3)
+            with open(f'{os.getcwd()}{os.sep}res{os.sep}{folder}{os.sep}{num}.json', 'w') as file:
+                json.dump({
+                    solver:{ 
+                        'time': time,
+                        'optimal': optimal,
+                        'obj': obj,
+                        'sol': sol
+                    }
+                }, file, indent=3)
             return False
         else:
             data[solver] = {

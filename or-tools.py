@@ -1,11 +1,41 @@
 import os
 import re
 import sys
+import numpy as np
 from ortools.sat.python import cp_model
 
-from utils import read_instance, parser_obj, check_symmetric, preprocess, path_sequence, write_json_solution
+from utils import read_instance, parser_obj, check_symmetric, preprocess, path_sequence, write_json_solution, lower_bound
 
-def apply_constraints(model, TENSOR, NODES, COURIERS, SIZE, MAX_LOAD):
+def main(args):
+    if args.instance is None:
+        print('Error: missing instance')
+        sys.exit(1)
+    instance = read_instance(args.instance)
+
+    COURIERS = instance['m']
+    ITEMS = instance['n']
+    MAX_LOAD = instance['l']
+    SIZE = [0] + instance['s']
+    D = instance['D']
+    NODES = ITEMS + 1
+
+    # Preprocess the distance matrix
+    D = preprocess(D)
+    symm = check_symmetric(D)
+    lower_bnd = lower_bound(D)
+
+    model = cp_model.CpModel()
+
+    # Decision variables
+    TENSOR = []
+    for i in range(NODES):
+        TENSOR.append([])
+        for j in range(NODES):
+            TENSOR[i].append([])
+            for k in range(COURIERS):
+                TENSOR[i][j].append(model.NewBoolVar(f'x_{i}_{j}_{k}'))
+                    
+    # Constraints
     # 1) Vehicle leaves node it enters
     for j in range(NODES):
         for k in range(COURIERS):
@@ -28,11 +58,7 @@ def apply_constraints(model, TENSOR, NODES, COURIERS, SIZE, MAX_LOAD):
         for k in range(COURIERS):
             model.Add(TENSOR[i][i][k] == 0)
 
-    # 6) All the items must be collected
-    #for i in range(1, NODES):
-    #    model.add(sum(TENSOR[i][j][k] for j in range(NODES) for k in range(COURIERS)) == 1)
-
-    # 7) Miller-Tucker-Zemlin formulation # TODO: check this constraint
+    # 6) Miller-Tucker-Zemlin formulation (MTZ)
     u = []
     Q = max(MAX_LOAD)
     for i in range(NODES):
@@ -44,43 +70,27 @@ def apply_constraints(model, TENSOR, NODES, COURIERS, SIZE, MAX_LOAD):
                 if i != j:
                     model.Add(u[j] - u[i] >= SIZE[j] - Q*(1 - TENSOR[i][j][k]))
 
-def main(args):
-    if args.instance is None:
-        print('Error: missing instance')
-        sys.exit(1)
-    instance = read_instance(args.instance)
+    # 7) size symmetry breaking:
+    for k1 in range(COURIERS):
+        for k2 in range(k1 + 1, COURIERS):
+            if MAX_LOAD[k1] == MAX_LOAD[k2]:
+                for i in range(NODES):
+                    for j in range(i + 1, NODES):
+                        model.AddAtMostOne(TENSOR[0][j][k1], TENSOR[0][i][k2])
 
-    COURIERS = instance['m']
-    ITEMS = instance['n']
-    MAX_LOAD = instance['l']
-    SIZE = [0] + instance['s']
-    D = instance['D']
-    NODES = ITEMS + 1
-
-    # Preprocess the distance matrix
-    D = preprocess(D)
-    symm = check_symmetric(D)
-
-    model = cp_model.CpModel()
-
-    # Decision variables
-    TENSOR = []
-    for i in range(NODES):
-        TENSOR.append([])
-        for j in range(NODES):
-            TENSOR[i].append([])
-            for k in range(COURIERS):
-                TENSOR[i][j].append(model.NewBoolVar(f'x_{i}_{j}_{k}'))
-                    
-    # Constraints
-    apply_constraints(model, TENSOR, NODES, COURIERS, SIZE, MAX_LOAD)
+    # 8) Path symmetry breaking for symmetric matrix only
+    if symm:
+        for k in range(COURIERS):
+            for i in range(NODES):
+                for j in range(i + 1, NODES):
+                    model.AddAtMostOne(TENSOR[0][j][k], TENSOR[i][0][k])
 
     # Objective function: minimize the maximum distance traveled by any vehicle
     arr_dist = []
     for k in range(COURIERS):
         arr_dist.append(sum(D[i][j] * TENSOR[i][j][k] for i in range(NODES) for j in range(NODES)))
 
-    obj = model.NewIntVar(0, sum(sum(row) for row in D), 'max_distance')
+    obj = model.NewIntVar(lower_bnd, sum(sum(row) for row in D), 'max_distance')
             
     model.AddMaxEquality(obj, arr_dist)
 
@@ -90,10 +100,10 @@ def main(args):
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = 300
     solver.parameters.log_search_progress = True
-    solver.parameters.num_search_workers = 1
-    #solver.parameters.linearization_level = 2
-    #if symm:
-    #    solver.parameters.symmetry_level = 3
+    solver.parameters.num_search_workers = 6
+    solver.parameters.linearization_level = 2
+    if symm:
+        solver.parameters.symmetry_level = 3
     status = solver.Solve(model)
 
     if status == cp_model.OPTIMAL or status == cp_model.FEASIBLE:

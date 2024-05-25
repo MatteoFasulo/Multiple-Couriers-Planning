@@ -51,6 +51,13 @@ constraint forall(k in 1..COURIERS, i in 2..NODES, j in 2..NODES where i != j) (
     u[j] - u[i] >= SIZE[j] - Q *(1 - TENSOR[i,j,k])
 );
 
+% 7) Size symmetry breaking
+constraint forall(k1 in 1..COURIERS, k2 in k1+1..COURIERS, i in 1..NODES, j in i+1..NODES) (
+    if SIZE[k1] == SIZE[k2] then
+        not(TENSOR[0,j,k1]) \/ not(TENSOR[0,i,k2])
+    endif
+);
+
 % Calculate the total distance traveled by each courier
 array[1..COURIERS] of var int: arr_dist = [sum(i in 1..NODES, j in 1..NODES)(D[i,j] * TENSOR[i,j,k]) | k in 1..COURIERS];
 
