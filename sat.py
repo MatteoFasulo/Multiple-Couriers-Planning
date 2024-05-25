@@ -84,7 +84,7 @@ def main(args):
     # 7) size symmetry breaking:
     for k1 in range(COURIERS):
         for k2 in range(k1 + 1, COURIERS):
-            if SIZE[k1] == SIZE[k2]:
+            if MAX_LOAD[k1] == MAX_LOAD[k2]:
                 for i in range(NODES):
                     for j in range(i + 1, NODES):
                         s.add(Not(And(TENSOR[0][j][k1], TENSOR[0][i][k2])))
