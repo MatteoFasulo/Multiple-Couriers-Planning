@@ -16,12 +16,6 @@ def check_symmetric(D):
 
     return np.allclose(D, D.T)
 
-def lower_bound(D):
-    # Replace diagonal with infinity (or any other suitable value)
-    D_copy = np.copy(D)
-    np.fill_diagonal(D_copy, 1e9)  # Replace NaN with infinity
-    return D_copy.min(axis=0).sum()
-
 def preprocess(D):
     """
     Preprocess the distance matrix
@@ -84,7 +78,7 @@ def convert_dat_to_dzn(filename: str):
 
 def write_json_solution(instance: str, folder: str, solver: str, time: int, optimal: bool, obj: int, sol: list):
     # Extract digit from string
-    num = int(re.search('\d+', instance).group())
+    num = int(re.search(r'\d+', instance).group())
 
     # read the json file as a dictionary 
     if os.path.exists(f'{os.getcwd()}{os.sep}res{os.sep}{folder}{os.sep}{num}.json'):
@@ -93,7 +87,6 @@ def write_json_solution(instance: str, folder: str, solver: str, time: int, opti
         
         # Check if the same solver is present in the json file
         if solver in data:
-            # Check if the time is lower than the previous one
             with open(f'{os.getcwd()}{os.sep}res{os.sep}{folder}{os.sep}{num}.json', 'w') as file:
                 json.dump({
                     solver:{ 
@@ -143,7 +136,12 @@ def parser_obj():
 
 if __name__ == '__main__':
     args = parser_obj()
-    if args.instance is not None:
+    if args.runall:
+        for instance in sorted(os.listdir('Instances'), key=lambda x: int(re.search(r'\d+', x).group())):
+            if instance.endswith('.dat'):
+                args.instance = f'Instances{os.sep}{instance}'
+                convert_dat_to_dzn(args.instance)
+    elif args.instance:
         convert_dat_to_dzn(args.instance)
     else:
         print('Error: missing instance')

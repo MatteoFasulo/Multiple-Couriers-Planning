@@ -1,5 +1,5 @@
 import os, re, sys, datetime
-from minizinc import Instance, Model, Solver
+from minizinc import Instance, Model, Solver, Status
 import numpy as np
 
 from utils import read_instance, parser_obj, path_sequence, check_symmetric, write_json_solution
@@ -29,11 +29,11 @@ def main(args):
     # 
     if D_symmetric:
         model.add_string(
-            """
-            constraint forall(k in 1..COURIERS, i in 1..NODES, j in i+1..NODES) (
-                not(TENSOR[0,j,k] /\ TENSOR[i,0,k])
-            );
-            """
+        r"""
+        constraint forall(k in 1..COURIERS, i in 1..NODES, j in i+1..NODES) (
+            not(TENSOR[1,j,k] /\ TENSOR[i,1,k])
+        );
+        """
         )
 
     if solver == Solver.lookup("gecode"):
@@ -65,7 +65,7 @@ def main(args):
     result = instance.solve(timeout=datetime.timedelta(seconds=300))
 
     # Check if a solution has been found
-    if not result:
+    if result.status is Status.UNKNOWN or result.status is Status.UNSATISFIABLE:
         print('No solution found')
         return
 
@@ -86,12 +86,12 @@ def main(args):
         print('\n')
         all_paths.append(path)
     
-    write_json_solution(args.instance, 'CP', solver.name.lower(), result.statistics['time'].total_seconds(), str(result.status) == 'OPTIMAL_SOLUTION', result.solution.objective, all_paths)
+    write_json_solution(args.instance, 'CP', solver.name.lower(), result.statistics['solveTime'].total_seconds(), result.status is Status.OPTIMAL_SOLUTION, result.solution.objective, all_paths)
 
 if __name__ == '__main__':
     args = parser_obj()
     if args.runall:
-        for instance in sorted(os.listdir('Instances'), key=lambda x: int(re.search('\d+', x).group())):
+        for instance in sorted(os.listdir('Instances'), key=lambda x: int(re.search(r'\d+', x).group())):
             if instance.endswith('.dat'):
                 args.instance = f'Instances{os.sep}{instance}'
                 main(args)

@@ -1,10 +1,9 @@
 import os
 import re
 import sys
-import numpy as np
 from ortools.sat.python import cp_model
 
-from utils import read_instance, parser_obj, check_symmetric, preprocess, path_sequence, write_json_solution, lower_bound
+from utils import *
 
 def main(args):
     if args.instance is None:
@@ -22,7 +21,6 @@ def main(args):
     # Preprocess the distance matrix
     D = preprocess(D)
     symm = check_symmetric(D)
-    lower_bnd = lower_bound(D)
 
     model = cp_model.CpModel()
 
@@ -90,7 +88,7 @@ def main(args):
     for k in range(COURIERS):
         arr_dist.append(sum(D[i][j] * TENSOR[i][j][k] for i in range(NODES) for j in range(NODES)))
 
-    obj = model.NewIntVar(lower_bnd, sum(sum(row) for row in D), 'max_distance')
+    obj = model.NewIntVar(0, sum(sum(row) for row in D), 'max_distance')
             
     model.AddMaxEquality(obj, arr_dist)
 
@@ -100,8 +98,7 @@ def main(args):
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = 300
     solver.parameters.log_search_progress = True
-    solver.parameters.num_search_workers = 6
-    solver.parameters.linearization_level = 2
+    solver.parameters.num_search_workers = 12
     if symm:
         solver.parameters.symmetry_level = 3
     status = solver.Solve(model)
@@ -131,7 +128,7 @@ def main(args):
 if __name__ == '__main__':
     args = parser_obj()
     if args.runall:
-        for instance in sorted(os.listdir('Instances'), key=lambda x: int(re.search('\d+', x).group())):
+        for instance in sorted(os.listdir('Instances'), key=lambda x: int(re.search(r'\d+', x).group())):
             if instance.endswith('.dat'):
                 args.instance = f'Instances{os.sep}{instance}'
                 main(args)

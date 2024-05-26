@@ -52,9 +52,11 @@ constraint forall(k in 1..COURIERS, i in 2..NODES, j in 2..NODES where i != j) (
 );
 
 % 7) Size symmetry breaking
-constraint forall(k1 in 1..COURIERS, k2 in k1+1..COURIERS, i in 1..NODES, j in i+1..NODES) (
+constraint forall(k1 in 1..COURIERS, k2 in k1+1..COURIERS) (
     if SIZE[k1] == SIZE[k2] then
-        not(TENSOR[0,j,k1]) \/ not(TENSOR[0,i,k2])
+        forall(i in 1..NODES, j in i+1..NODES) (
+            not(TENSOR[1,j,k1] /\ TENSOR[1,i,k2])
+        )
     endif
 );
 
@@ -62,12 +64,12 @@ constraint forall(k1 in 1..COURIERS, k2 in k1+1..COURIERS, i in 1..NODES, j in i
 array[1..COURIERS] of var int: arr_dist = [sum(i in 1..NODES, j in 1..NODES)(D[i,j] * TENSOR[i,j,k]) | k in 1..COURIERS];
 
 % Objective function: minimize the maximum distance traveled by any vehicle
-var 0..sum([sum(D[i,..]) | i in 1..NODES]) : obj;
+var 1..sum([sum(D[i,..]) | i in 1..NODES]) : obj;
 
 constraint (
     obj == max(arr_dist)
 );
 
 output [
-    "arr_dist: \(arr_dist)\n"
+    "Distance array: "++show(arr_dist)++"\n"++"Objective function: "++show(obj)
 ];

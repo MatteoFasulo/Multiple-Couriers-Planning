@@ -153,7 +153,7 @@ def main(args):
 if __name__ == '__main__':
     args = parser_obj()
     if args.runall:
-        for instance in sorted(os.listdir('Instances'), key=lambda x: int(re.search('\d+', x).group())):
+        for instance in sorted(os.listdir('Instances'), key=lambda x: int(re.search(r'\d+', x).group())):
             if instance.endswith('.dat'):
                 args.instance = f'Instances{os.sep}{instance}'
                 main(args)
