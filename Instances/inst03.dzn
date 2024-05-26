@@ -1,5 +1,7 @@
 COURIERS = 3;
 ITEMS = 7;
+LOWER_BOUND = 8;
+UPPER_BOUND = 44;
 MAX_LOAD = [15, 10, 7];
 SIZE = [0, 3, 2, 6, 8, 5, 4, 4];
 D = [|0, 2, 3, 3, 4, 3, 4, 4, 

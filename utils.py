@@ -10,37 +10,121 @@ def check_symmetric(D):
     """
     Check if the distance matrix is symmetric
     """
-    # Convert the distance matrix to a numpy array if it is not
-    if not isinstance(D, np.ndarray):
-        D = np.array(D)
-
     return np.allclose(D, D.T)
 
-def preprocess(D):
+def preprocess(D, depot: int = -1):
     """
     Preprocess the distance matrix
     """
     # load it as a numpy array
     D = np.array(D)
-    D = np.insert(D, 0, D[-1], axis=0)
-    D = np.delete(D, -1, axis=0)
-    D = np.insert(D, 0, D[:, -1], axis=1)
-    D = np.delete(D, -1, axis=1)
+    if depot == 0: # take last row and col and put them in the first row and col shifting the rest
+        D = np.insert(D, 0, D[-1], axis=0)
+        D = np.delete(D, -1, axis=0)
+        D = np.insert(D, 0, D[:, -1], axis=1)
+        D = np.delete(D, -1, axis=1)
     return D
+
+def get_nodes_and_weights(D):
+    starting_nodes = []
+    ending_nodes = []
+    weights = []
+    for i in range(1, len(D[0])+1):
+        for j in range(1, len(D[0])+1):
+            if i != j and i < len(D[0]):
+                starting_nodes.append(i+1)
+                ending_nodes.append(j+1)
+                weights.append(D[i-1][j-1])
+            elif i != j:
+                starting_nodes.append(1)
+                ending_nodes.append(j+1)
+                weights.append(D[i-1][j-1])
+            elif i == j and i == len(D[0]):
+                starting_nodes.append(1)
+                ending_nodes.append(len(D[0])+1)
+                weights.append(0)
+
+    return starting_nodes, ending_nodes, weights
+
+def compute_lower_bound(D, MAX_LOAD, SIZE):
+    """
+    Compute the lower bound of the problem
+    """
+    # Get the last row and column from the distances matrix
+    first_row = D[0]
+    first_column = [D[i][0] for i in range(len(D[0]))]
+    smallest_courier_capaciy = min(MAX_LOAD)
+    largest_item_size = max(SIZE)
+
+    # Calculate the maximum values for the last row and column
+    max_value1 = first_column[np.argmax(first_row)] + np.max(first_row)
+    max_value2 = first_row[np.argmax(first_column)] + np.max(first_column)
+
+    # The lower bound is the maximum of these two values
+    lb = np.max([max_value1, max_value2])
+
+    # If all_travel is False, set the lower bound for courier distances to 0
+    if not smallest_courier_capaciy >= largest_item_size:
+        dist_lb = 0
+    else:
+        # Otherwise, calculate the minimum values for the last row and column
+        min_value1 = first_column[np.argmin(first_row)] + np.min(first_row)
+        min_value2 = first_row[np.argmin(first_column)] + np.min(first_column)
+
+        # The lower bound for courier distances is the minimum of these two values
+        dist_lb = np.min([min_value1, min_value2]) 
+
+    # Return the lower bounds
+    return lb, dist_lb
+
+def compute_upper_bound(D, ITEMS):
+    """
+    Compute the upper bound of the problem
+    """
+    return sum([max(D[i]) for i in range(ITEMS)])
+    
 
 def read_instance(filename: str) -> dict:
     with open(filename, 'r') as file:
         data = file.read().splitlines()
+
+    couriers = int(data[0])
+    items = int(data[1])
+    max_load = [int(x) for x in data[2].split()]
+    sizes = [int(x) for x in data[3].split()]
+    D = [[int(x) for x in line.split()] for line in data[4:]]
+
+    # Preprocess the distance matrix
+    D = preprocess(D, depot=0)
+
+    # Sort the max load in descending order
+    #max_load.sort(reverse=True)
+
+    # Sort the items in ascending order
+    #sizes.sort()
+
+    # Insert 0 demand for the depot
+    sizes.insert(0, 0)
+
+    # Get starting nodes, ending nodes and weights
+    starting_nodes, ending_nodes, weights = get_nodes_and_weights(D)
     
     return {
-        'm': int(data[0]), # Number of couriers
-        'n': int(data[1]), # Number of items
-        'l': [int(x) for x in data[2].split()], # maximum load size
-        's': [int(x) for x in data[3].split()], # size of items
-        'D': [[int(x) for x in line.split()] for line in data[4:]] # distance matrix
+        'm': couriers,
+        'n': items,
+        'l': max_load,
+        's': sizes,
+        'D': D,
+        'D_symmetric': check_symmetric(D),
+        'lower_bound': compute_lower_bound(D, max_load, sizes),
+        'upper_bound': compute_upper_bound(D, items),
+        'starting_nodes': starting_nodes,
+        'ending_nodes': ending_nodes,
+        'weights': weights,
+        'num_edges': len(starting_nodes)
     }
 
-def path_sequence(path, D=None): # TODO: fix this function using OrderedDict with move_to_end
+def path_sequence(path, D=None):
     """
     Calculate the cost of a path sequence
     """
@@ -66,11 +150,16 @@ def convert_dat_to_dzn(filename: str):
     with open(filename.replace('.dat', '.dzn'), 'w') as file:
         file.write(f'COURIERS = {instance["m"]};\n')
         file.write(f'ITEMS = {instance["n"]};\n')
+        #file.write(f'n_edges = {instance["num_edges"]};\n')
+        file.write(f'LOWER_BOUND = {instance["lower_bound"][0]};\n')
+        file.write(f'UPPER_BOUND = {instance["upper_bound"]};\n')
         file.write(f'MAX_LOAD = {instance["l"]};\n')
-        file.write(f'SIZE = {[0] + instance["s"]};\n') # Prepend 0 to the list of sizes to match the indexing
-        D = preprocess(instance['D']) # Preprocess the distance matrix
+        file.write(f'SIZE = {instance["s"]};\n')
+        #file.write(f'starting_nd = {instance["starting_nodes"]};\n')
+        #file.write(f'ending_nd = {instance["ending_nodes"]};\n')
+        #file.write(f'weights = {instance["weights"]};\n')
         file.write('D = [|')
-        for row in D:
+        for row in instance['D']:
             for elem in row:
                 file.write(f'{elem}, ')
             file.write(f'\n|')
@@ -131,6 +220,7 @@ def parser_obj():
     parser.add_argument('--instance', type=str, metavar='--i', help='Input instance', required=False)
     parser.add_argument('--runall', help='Run all instances', default=False, required=False, action='store_true')
     parser.add_argument('--verbose', help='Verbose mode', default=False, required=False, action='store_true')
+    parser.add_argument('--timeout', type=int, metavar='--t', help='Timeout for the solver', default=300, required=False)
     
     return parser.parse_args()
 

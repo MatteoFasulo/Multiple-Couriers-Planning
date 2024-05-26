@@ -14,13 +14,9 @@ def main(args):
     COURIERS = instance['m']
     ITEMS = instance['n']
     MAX_LOAD = instance['l']
-    SIZE = [0] + instance['s']
+    SIZE = instance['s']
     D = instance['D']
     NODES = ITEMS + 1
-
-    # Preprocess the distance matrix
-    D = preprocess(D)
-    symm = check_symmetric(D)
 
     model = cp_model.CpModel()
 
@@ -77,7 +73,7 @@ def main(args):
                         model.AddAtMostOne(TENSOR[0][j][k1], TENSOR[0][i][k2])
 
     # 8) Path symmetry breaking for symmetric matrix only
-    if symm:
+    if instance['D_symmetric']:
         for k in range(COURIERS):
             for i in range(NODES):
                 for j in range(i + 1, NODES):
@@ -96,10 +92,11 @@ def main(args):
     model.Minimize(obj)
     
     solver = cp_model.CpSolver()
-    solver.parameters.max_time_in_seconds = 300
-    solver.parameters.log_search_progress = True
+    solver.parameters.max_time_in_seconds = args.timeout
+    if args.verbose:
+        solver.parameters.log_search_progress = True
     solver.parameters.num_search_workers = 12
-    if symm:
+    if instance['D_symmetric']:
         solver.parameters.symmetry_level = 3
     status = solver.Solve(model)
 

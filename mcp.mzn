@@ -4,6 +4,8 @@ include "globals.mzn";
 int: ITEMS;
 int: NODES = ITEMS+1;
 int: COURIERS;
+int: LOWER_BOUND;
+int: UPPER_BOUND;
 array[1..NODES] of int: SIZE;
 array[1..NODES, 1..NODES] of int: D;
 array[1..COURIERS] of int: MAX_LOAD;
@@ -25,7 +27,7 @@ constraint forall(j in 2..NODES) (
 % 3) Every vehicle starts from the depot and ends at the depot
 % Use count(i in x)(i=v) >= n instead.
 constraint forall(k in 1..COURIERS) (
-    sum([TENSOR[1,j,k] | j in 2..NODES]) = 1
+    count([TENSOR[1,j,k] | j in 2..NODES], true) = 1
 );
 
 % 4) Capacity constraints
@@ -64,11 +66,13 @@ constraint forall(k1 in 1..COURIERS, k2 in k1+1..COURIERS) (
 array[1..COURIERS] of var int: arr_dist = [sum(i in 1..NODES, j in 1..NODES)(D[i,j] * TENSOR[i,j,k]) | k in 1..COURIERS];
 
 % Objective function: minimize the maximum distance traveled by any vehicle
-var 1..sum([sum(D[i,..]) | i in 1..NODES]) : obj;
+var LOWER_BOUND..UPPER_BOUND : obj;
 
 constraint (
     obj == max(arr_dist)
 );
+
+%solve minimize obj;
 
 output [
     "Distance array: "++show(arr_dist)++"\n"++"Objective function: "++show(obj)
