@@ -146,9 +146,8 @@ def main(args):
             s.add(obj < model[obj])
 
             outcome = s.check()
-            print(outcome)
             if outcome != sat:
-                if outcome == sat:  # can also be unknown
+                if outcome == unsat:  # can also be unsat
                     solved = True
                 break
 
