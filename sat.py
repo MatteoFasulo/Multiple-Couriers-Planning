@@ -1,4 +1,4 @@
-import os, re, sys
+import os, re, sys, time
 from itertools import combinations
 from z3 import *
 from utils import *
@@ -19,7 +19,7 @@ def at_least_one_he(bool_vars):
 
 def at_most_one_he(bool_vars, name):
     if len(bool_vars) <= 4:
-        return [Not(And(pair[0], pair[1])) for pair in combinations(bool_vars, 2)]
+        return And([Not(And(pair[0], pair[1])) for pair in combinations(bool_vars, 2)])
     y = Bool(f"y_{name}")
     return And(And(at_most_one_np(bool_vars[:3] + [y])), And(at_most_one_he(bool_vars[3:] + [Not(y)], name+"_")))
 
@@ -50,12 +50,13 @@ def main(args):
     D = instance['D']
     NODES = ITEMS + 1
 
+    start = time.time()
     D = preprocess(D)
     symm = check_symmetric(D)
     lower_bnd = compute_lower_bound(D, MAX_LOAD, SIZE)
     upper_bnd = compute_upper_bound(D, NODES)
 
-    s = Optimize()
+    s = Solver()
     s.set("timeout", 300_000)
 
     TENSOR = [[[Bool(f'x{i}_{j}_{k}') for k in range(COURIERS)] for j in range(NODES)] for i in range(NODES)]
@@ -116,11 +117,10 @@ def main(args):
         arr_dist.append(Sum([If(TENSOR[i][j][k], int(D[i][j]), 0) for i in range(NODES) for j in range(NODES)]))
 
     obj = Int('max_distance')
-    #s.add(And(obj >= lower_bnd, obj <= sum([sum(row) for row in D])))
 
     s.add(obj == max_z3(arr_dist))
-
-    min_obj_val = s.minimize(obj)
+    s.add(obj >= lower_bnd[0])
+    s.add(obj <= upper_bnd)
 
     outcome = s.check()
     if outcome != sat:
@@ -128,7 +128,14 @@ def main(args):
         return
 
     else:
-        model = s.model()
+        while True:
+            model = s.model()
+            print(model[obj])
+            s.add(obj < model[obj])
+
+            outcome = s.check()
+            if outcome != sat:
+                break
 
         all_paths = []
         max_cost = 0
@@ -148,7 +155,7 @@ def main(args):
             print('\n')
             all_paths.append(path)
 
-        write_json_solution(args.instance, 'SAT', 'z3', s.statistics().get_key_value('time'), str(outcome) == 'sat', min_obj_val.value().as_long(), all_paths)
+        write_json_solution(args.instance, 'SAT', 'z3', int(time.time() - start), str(outcome) == 'sat', model[obj].as_long(), all_paths)
 
 
 if __name__ == '__main__':
