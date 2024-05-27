@@ -18,6 +18,9 @@ def main(args):
     D = instance['D']
     NODES = ITEMS + 1
 
+    lower_bound = instance['lower_bound'][0]
+    upper_bound = instance['upper_bound']
+
     model = cp_model.CpModel()
 
     # Decision variables
@@ -41,7 +44,7 @@ def main(args):
 
     # 3) Every vehicle starts from the depot and ends at the depot
     for k in range(COURIERS):
-        model.AddExactlyOne([TENSOR[0][j][k] for j in range(1, NODES)]) # assumption of courier doing one routing path
+        model.AddExactlyOne([TENSOR[0][j][k] for j in range(1, NODES)])
 
     # 4) Capacity constraints
     for k in range(COURIERS):
@@ -64,6 +67,10 @@ def main(args):
                 if i != j:
                     model.Add(u[j] - u[i] >= SIZE[j] - Q*(1 - TENSOR[i][j][k]))
 
+    # 6) All the items must be collected
+    #for i in range(1, NODES):
+    #    model.add(sum(TENSOR[i][j][k] for j in range(NODES) for k in range(COURIERS)) == 1)
+
     # 7) size symmetry breaking:
     for k1 in range(COURIERS):
         for k2 in range(k1 + 1, COURIERS):
@@ -84,7 +91,7 @@ def main(args):
     for k in range(COURIERS):
         arr_dist.append(sum(D[i][j] * TENSOR[i][j][k] for i in range(NODES) for j in range(NODES)))
 
-    obj = model.NewIntVar(0, sum(sum(row) for row in D), 'max_distance')
+    obj = model.NewIntVar(lower_bound, upper_bound, 'max_distance')
             
     model.AddMaxEquality(obj, arr_dist)
 

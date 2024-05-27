@@ -1,6 +1,6 @@
 {
    "ortools": {
-      "time": 0.052832342000000004,
+      "time": 0.084844206,
       "optimal": true,
       "obj": 14,
       "sol": [

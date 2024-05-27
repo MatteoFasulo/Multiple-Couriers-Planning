@@ -1,20 +1,6 @@
 {
-   "chuffed": {
-      "time": 0.0,
-      "optimal": true,
-      "obj": 206,
-      "sol": [
-         [
-            2
-         ],
-         [
-            1,
-            3
-         ]
-      ]
-   },
-   "gecode": {
-      "time": 0.000175,
+   "or tools cp-sat": {
+      "time": 0.003797,
       "optimal": true,
       "obj": 206,
       "sol": [

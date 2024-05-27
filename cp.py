@@ -6,7 +6,7 @@ from utils import *
 
 def main(args):
     # Define the solver to use
-    solver = Solver.lookup("gecode")
+    solver = Solver.lookup("com.google.ortools.sat")
 
     # Get the args from CLI
     if args.instance is None:
@@ -20,7 +20,7 @@ def main(args):
     problem = read_instance(args.instance)
 
     # Instantiate the model using the MiniZinc .mzn file
-    model = Model("mcp.mzn")
+    model = Model("new_model.mzn")
 
     # Add one more constraint if the distance matrix is symmetric
     # 
@@ -36,14 +36,15 @@ def main(args):
     if solver == Solver.lookup("gecode"):
         model.add_string(
             r"""
-            solve :: int_search([TENSOR[i,j,k] | i in 1..NODES, j in 1..NODES, k in 1..COURIERS], first_fail, indomain_min)
+            solve :: bool_search([TENSOR[i,j,k] | i in 1..NODES, j in 1..NODES, k in 1..COURIERS], first_fail, indomain_min)
             minimize(obj);
             """
         )
     else:
         model.add_string(
             r"""
-            solve minimize obj;
+            solve ::  int_search(loads, first_fail, indomain_min)
+                    minimize(obj);
             """
         )
 
@@ -65,26 +66,45 @@ def main(args):
         return
 
     print(result.solution)
+    ns = result.solution.ns
+    es = result.solution.es
+    obj_dist = result.solution.path_dist
+    starting_nd = problem["starting_nodes"]
+    ending_nd = problem["ending_nodes"] 
+
+    res = []
+    for k in range(len(ns)):
+        path = search_graph_path(starting_nd, ending_nd, es, k)
+        start_pos = 0
+        asg = []
+        while len(path) != 1:
+            asg.append(path[start_pos])
+            tmp = path[start_pos]
+            path.pop(start_pos)
+            start_pos = tmp
+        res.append(asg)
+
+    print(res)
 
     # Retrieve the solution
-    TENSOR = result["TENSOR"]
-    TENSOR = np.array(TENSOR).reshape(NODES, NODES, COURIERS)
-
-    # Print the tensor
-    all_paths = []
-    for k in range(COURIERS):
-        path = []
-        for i in range(NODES):
-            for j in range(NODES):
-                if TENSOR[i][j][k] == 1:
-                    path.append((i,j))
-        path_sequence(path)
-        path = [x[1] for x in path[:-1]]
-        print(f'Courier: {k}\tPath sequence: {path}')
-        print('\n')
-        all_paths.append(path)
-
-    write_json_solution(args.instance, 'CP', solver.name.lower(), result.statistics['solveTime'].total_seconds(), result.status is Status.OPTIMAL_SOLUTION, result.solution.objective, all_paths)
+    #TENSOR = result["TENSOR"]
+    #TENSOR = np.array(TENSOR).reshape(NODES, NODES, COURIERS)
+#
+    ## Print the tensor
+    #all_paths = []
+    #for k in range(COURIERS):
+    #    path = []
+    #    for i in range(NODES):
+    #        for j in range(NODES):
+    #            if TENSOR[i][j][k] == 1:
+    #                path.append((i,j))
+    #    path_sequence(path)
+    #    path = [x[1] for x in path[:-1]]
+    #    print(f'Courier: {k}\tPath sequence: {path}')
+    #    print('\n')
+    #    all_paths.append(path)
+#
+    #write_json_solution(args.instance, 'CP', solver.name.lower(), result.statistics['solveTime'].total_seconds(), result.status is Status.OPTIMAL_SOLUTION, result.solution.objective, all_paths)
 
 if __name__ == '__main__':
     args = parser_obj()

@@ -1,13 +1,13 @@
 {
-   "gecode": {
-      "time": 0.016687,
+   "or tools cp-sat": {
+      "time": 1.11571,
       "optimal": true,
       "obj": 14,
       "sol": [
          [
-            4,
+            1,
             3,
-            1
+            4
          ],
          [
             2,

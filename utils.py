@@ -12,7 +12,7 @@ def check_symmetric(D):
     """
     return np.allclose(D, D.T)
 
-def preprocess(D, depot: int = -1):
+def preprocess(D, depot: int = 0):
     """
     Preprocess the distance matrix
     """
@@ -46,36 +46,52 @@ def get_nodes_and_weights(D):
 
     return starting_nodes, ending_nodes, weights
 
-def compute_lower_bound(D, MAX_LOAD, SIZE):
+def compute_lower_bound(D, MAX_LOAD, SIZE, depot: int = 0):
     """
     Compute the lower bound of the problem
     """
-    # Get the last row and column from the distances matrix
-    first_row = D[0]
-    first_column = [D[i][0] for i in range(len(D[0]))]
     smallest_courier_capaciy = min(MAX_LOAD)
     largest_item_size = max(SIZE)
+    if depot == 0:
+        # Get the last row and column from the distances matrix
+        first_row = D[0]
+        first_column = [D[i][0] for i in range(len(D[0]))]
+        
+        # Calculate the maximum values for the last row and column
+        max_value1 = first_column[np.argmax(first_row)] + np.max(first_row)
+        max_value2 = first_row[np.argmax(first_column)] + np.max(first_column)
 
-    # Calculate the maximum values for the last row and column
-    max_value1 = first_column[np.argmax(first_row)] + np.max(first_row)
-    max_value2 = first_row[np.argmax(first_column)] + np.max(first_column)
+        # The lower bound is the maximum of these two values
+        lb = np.max([max_value1, max_value2])
 
-    # The lower bound is the maximum of these two values
-    lb = np.max([max_value1, max_value2])
+        # If all_travel is False, set the lower bound for courier distances to 0
+        if not smallest_courier_capaciy >= largest_item_size:
+            dist_lb = 0
+        else:
+            # Otherwise, calculate the minimum values for the last row and column
+            min_value1 = first_column[np.argmin(first_row)] + np.min(first_row)
+            min_value2 = first_row[np.argmin(first_column)] + np.min(first_column)
 
-    # If all_travel is False, set the lower bound for courier distances to 0
-    if not smallest_courier_capaciy >= largest_item_size:
-        dist_lb = 0
+            # The lower bound for courier distances is the minimum of these two values
+            dist_lb = np.min([min_value1, min_value2]) 
+
+        # Return the lower bounds
+        return lb, dist_lb
     else:
-        # Otherwise, calculate the minimum values for the last row and column
-        min_value1 = first_column[np.argmin(first_row)] + np.min(first_row)
-        min_value2 = first_row[np.argmin(first_column)] + np.min(first_column)
+        last_row = D[-1]
+        last_column = [D[i][-1] for i in range(len(D[0]))]
+        value1 = last_column[np.argmax(last_row)] + max(last_row)
+        value2 = last_row[np.argmax(last_column)] + max(last_column)
+        lb = max(value1, value2)
 
-        # The lower bound for courier distances is the minimum of these two values
-        dist_lb = np.min([min_value1, min_value2]) 
-
-    # Return the lower bounds
-    return lb, dist_lb
+        if not smallest_courier_capaciy >= largest_item_size:
+            dist_lb = 0
+        else:
+            value1 = last_column[np.argmin(last_row)] + min(last_row)
+            value2 = last_row[np.argmin(last_column)] + min(last_column)
+            dist_lb = min(value1, value2) 
+            
+        return lb, dist_lb
 
 def compute_upper_bound(D, NODES):
     """
@@ -95,7 +111,7 @@ def read_instance(filename: str) -> dict:
     D = [[int(x) for x in line.split()] for line in data[4:]]
 
     # Preprocess the distance matrix
-    D = preprocess(D, depot=0)
+    D = preprocess(D, depot=-1)
 
     # Sort the max load in descending order
     #max_load.sort(reverse=True)
@@ -104,7 +120,7 @@ def read_instance(filename: str) -> dict:
     #sizes.sort()
 
     # Insert 0 demand for the depot
-    sizes.insert(0, 0)
+    #sizes.insert(0, 0)
 
     # Get starting nodes, ending nodes and weights
     starting_nodes, ending_nodes, weights = get_nodes_and_weights(D)
@@ -116,7 +132,7 @@ def read_instance(filename: str) -> dict:
         's': sizes,
         'D': D,
         'D_symmetric': check_symmetric(D),
-        'lower_bound': compute_lower_bound(D, max_load, sizes),
+        'lower_bound': compute_lower_bound(D, max_load, sizes, depot=-1),
         'upper_bound': compute_upper_bound(D, items+1),
         'starting_nodes': starting_nodes,
         'ending_nodes': ending_nodes,
@@ -145,25 +161,36 @@ def path_sequence(path, D=None):
         cost += D[i][j]
     return cost
 
+def search_graph_path(starting_nd, ending_nd, es, courier):
+    true_path = {}
+    for j in range(len(es[courier])):
+
+        if es[courier][j]:
+            start_pos = starting_nd[j] - 1
+            end_pos = ending_nd[j] - 1
+            true_path[start_pos] = end_pos
+
+    return true_path
+
 def convert_dat_to_dzn(filename: str):
     instance = read_instance(filename)
     with open(filename.replace('.dat', '.dzn'), 'w') as file:
         file.write(f'couriers = {instance["m"]};\n')
         file.write(f'items = {instance["n"]};\n')
-        #file.write(f'n_edges = {instance["num_edges"]};\n')
+        file.write(f'n_edges = {instance["num_edges"]};\n')
         file.write(f'LOWER_BOUND = {instance["lower_bound"][0]};\n')
         file.write(f'UPPER_BOUND = {instance["upper_bound"]};\n')
         file.write(f'CAPACITY = {instance["l"]};\n')
         file.write(f'DEMAND = {instance["s"]};\n')
-        #file.write(f'starting_nd = {instance["starting_nodes"]};\n')
-        #file.write(f'ending_nd = {instance["ending_nodes"]};\n')
-        #file.write(f'weights = {instance["weights"]};\n')
-        file.write('D = [|')
-        for row in instance['D']:
-            for elem in row:
-                file.write(f'{elem}, ')
-            file.write(f'\n|')
-        file.write('];\n')
+        file.write(f'starting_nd = {instance["starting_nodes"]};\n')
+        file.write(f'ending_nd = {instance["ending_nodes"]};\n')
+        file.write(f'weights = {instance["weights"]};\n')
+        #file.write('D = [|')
+        #for row in instance['D']:
+        #    for elem in row:
+        #        file.write(f'{elem}, ')
+        #    file.write(f'\n|')
+        #file.write('];\n')
 
 def write_json_solution(instance: str, folder: str, solver: str, time: int, optimal: bool, obj: int, sol: list):
     # Extract digit from string
