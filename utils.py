@@ -77,11 +77,11 @@ def compute_lower_bound(D, MAX_LOAD, SIZE):
     # Return the lower bounds
     return lb, dist_lb
 
-def compute_upper_bound(D, ITEMS):
+def compute_upper_bound(D, NODES):
     """
     Compute the upper bound of the problem
     """
-    return sum([max(D[i]) for i in range(ITEMS)])
+    return sum([max(D[i]) for i in range(1, NODES)])
     
 
 def read_instance(filename: str) -> dict:
@@ -117,7 +117,7 @@ def read_instance(filename: str) -> dict:
         'D': D,
         'D_symmetric': check_symmetric(D),
         'lower_bound': compute_lower_bound(D, max_load, sizes),
-        'upper_bound': compute_upper_bound(D, items),
+        'upper_bound': compute_upper_bound(D, items+1),
         'starting_nodes': starting_nodes,
         'ending_nodes': ending_nodes,
         'weights': weights,
@@ -148,13 +148,13 @@ def path_sequence(path, D=None):
 def convert_dat_to_dzn(filename: str):
     instance = read_instance(filename)
     with open(filename.replace('.dat', '.dzn'), 'w') as file:
-        file.write(f'COURIERS = {instance["m"]};\n')
-        file.write(f'ITEMS = {instance["n"]};\n')
+        file.write(f'couriers = {instance["m"]};\n')
+        file.write(f'items = {instance["n"]};\n')
         #file.write(f'n_edges = {instance["num_edges"]};\n')
         file.write(f'LOWER_BOUND = {instance["lower_bound"][0]};\n')
         file.write(f'UPPER_BOUND = {instance["upper_bound"]};\n')
-        file.write(f'MAX_LOAD = {instance["l"]};\n')
-        file.write(f'SIZE = {instance["s"]};\n')
+        file.write(f'CAPACITY = {instance["l"]};\n')
+        file.write(f'DEMAND = {instance["s"]};\n')
         #file.write(f'starting_nd = {instance["starting_nodes"]};\n')
         #file.write(f'ending_nd = {instance["ending_nodes"]};\n')
         #file.write(f'weights = {instance["weights"]};\n')

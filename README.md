@@ -24,3 +24,9 @@ python smt_or.py --i Instances/inst01.dat
 ```python
 python check_solution.py Instances res/
 ```
+
+### Generate .dzn files
+
+```python
+python utils.py --runall
+```

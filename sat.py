@@ -1,7 +1,7 @@
 import os, re, sys
 from itertools import combinations
 from z3 import *
-from utils import read_instance, parser_obj, check_symmetric, preprocess, path_sequence, write_json_solution, lower_bound
+from utils import *
 
 # Naive encoding
 def at_least_one_np(bool_vars):
@@ -11,7 +11,7 @@ def at_most_one_np(bool_vars):
     return And([Not(And(pair[0], pair[1])) for pair in combinations(bool_vars, 2)])
 
 def exactly_one_np(bool_vars, name = ""):
-    return And(at_least_one_np(bool_vars), at_most_one_np(bool_vars, name))
+    return And(at_least_one_np(bool_vars), at_most_one_np(bool_vars))
 
 # Heule encoding
 def at_least_one_he(bool_vars):
@@ -46,13 +46,14 @@ def main(args):
     COURIERS = instance['m']
     ITEMS = instance['n']
     MAX_LOAD = instance['l']
-    SIZE = [0] + instance['s']
+    SIZE = instance['s']
     D = instance['D']
     NODES = ITEMS + 1
 
     D = preprocess(D)
     symm = check_symmetric(D)
-    lower_bnd = lower_bound(D)
+    lower_bnd = compute_lower_bound(D, MAX_LOAD, SIZE)
+    upper_bnd = compute_upper_bound(D, NODES)
 
     s = Optimize()
     s.set("timeout", 300_000)
