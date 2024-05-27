@@ -52,52 +52,61 @@ def compute_lower_bound(D, MAX_LOAD, SIZE, depot: int = 0):
     """
     smallest_courier_capaciy = min(MAX_LOAD)
     largest_item_size = max(SIZE)
+
     if depot == 0:
         # Get the last row and column from the distances matrix
         first_row = D[0]
         first_column = [D[i][0] for i in range(len(D[0]))]
-        
-        # Calculate the maximum values for the last row and column
-        max_value1 = first_column[np.argmax(first_row)] + np.max(first_row)
-        max_value2 = first_row[np.argmax(first_column)] + np.max(first_column)
 
-        # The lower bound is the maximum of these two values
-        lb = np.max([max_value1, max_value2])
-
-        # If all_travel is False, set the lower bound for courier distances to 0
-        if not smallest_courier_capaciy >= largest_item_size:
-            dist_lb = 0
-        else:
-            # Otherwise, calculate the minimum values for the last row and column
-            min_value1 = first_column[np.argmin(first_row)] + np.min(first_row)
-            min_value2 = first_row[np.argmin(first_column)] + np.min(first_column)
-
-            # The lower bound for courier distances is the minimum of these two values
-            dist_lb = np.min([min_value1, min_value2]) 
-
-        # Return the lower bounds
-        return lb, dist_lb
     else:
         last_row = D[-1]
         last_column = [D[i][-1] for i in range(len(D[0]))]
-        value1 = last_column[np.argmax(last_row)] + max(last_row)
-        value2 = last_row[np.argmax(last_column)] + max(last_column)
-        lb = max(value1, value2)
+        first_row = last_row
+        first_column = last_column
+        
+    # Calculate the maximum values for the last row and column
+    max_value1 = first_column[np.argmax(first_row)] + np.max(first_row)
+    max_value2 = first_row[np.argmax(first_column)] + np.max(first_column)
 
-        if not smallest_courier_capaciy >= largest_item_size:
-            dist_lb = 0
-        else:
-            value1 = last_column[np.argmin(last_row)] + min(last_row)
-            value2 = last_row[np.argmin(last_column)] + min(last_column)
-            dist_lb = min(value1, value2) 
-            
-        return lb, dist_lb
+    # The lower bound is the maximum of these two values
+    lb = np.max([max_value1, max_value2])
 
-def compute_upper_bound(D, NODES):
+    # If all_travel is False, set the lower bound for courier distances to 0
+    if not smallest_courier_capaciy >= largest_item_size:
+        dist_lb = 0
+
+    else:
+        # Otherwise, calculate the minimum values for the last row and column
+        min_value1 = first_column[np.argmin(first_row)] + np.min(first_row)
+        min_value2 = first_row[np.argmin(first_column)] + np.min(first_column)
+
+        # The lower bound for courier distances is the minimum of these two values
+        dist_lb = np.min([min_value1, min_value2]) 
+
+    # Return the lower bounds
+    return lb, dist_lb
+
+def compute_upper_bound(D, MAX_LOAD, SIZE):
     """
     Compute the upper bound of the problem
     """
-    return sum([max(D[i]) for i in range(1, NODES)])
+    smallest_courier_capaciy = min(MAX_LOAD)
+    largest_item_size = max(SIZE)
+
+    if not smallest_courier_capaciy >= largest_item_size:
+        return sum([max(D[i]) for i in range(len(SIZE)+1)])
+
+    else:
+        D_sorted = D[np.max(D, axis=0).argsort()]
+        max_long_path = sum([max(D_sorted[i]) for i in range(len(MAX_LOAD)-1, len(SIZE)+1)])
+
+        return int(max_long_path)
+
+def sort_couriers(MAX_LOAD):
+    """
+    Sort the couriers based on their capacity
+    """
+    return sorted(MAX_LOAD, reverse=True)
     
 
 def read_instance(filename: str) -> dict:
@@ -128,12 +137,12 @@ def read_instance(filename: str) -> dict:
     return {
         'm': couriers,
         'n': items,
-        'l': max_load,
+        'l': sort_couriers(max_load),
         's': sizes,
         'D': D,
         'D_symmetric': check_symmetric(D),
         'lower_bound': compute_lower_bound(D, max_load, sizes, depot=-1),
-        'upper_bound': compute_upper_bound(D, items+1),
+        'upper_bound': compute_upper_bound(D, max_load, sizes),
         'starting_nodes': starting_nodes,
         'ending_nodes': ending_nodes,
         'weights': weights,
