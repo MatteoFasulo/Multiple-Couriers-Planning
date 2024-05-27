@@ -1,6 +1,6 @@
 {
-   "ortools": {
-      "time": 0.008660429,
+   "z3": {
+      "time": 0,
       "optimal": true,
       "obj": 206,
       "sol": [

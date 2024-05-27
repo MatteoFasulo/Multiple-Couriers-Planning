@@ -3,25 +3,31 @@ from itertools import combinations
 from z3 import *
 from utils import *
 
+
 # Naive encoding
 def at_least_one_np(bool_vars):
     return Or(bool_vars)
 
+
 def at_most_one_np(bool_vars):
     return And([Not(And(pair[0], pair[1])) for pair in combinations(bool_vars, 2)])
+
 
 def exactly_one_np(bool_vars, name = ""):
     return And(at_least_one_np(bool_vars), at_most_one_np(bool_vars))
 
+
 # Heule encoding
 def at_least_one_he(bool_vars):
     return at_least_one_np(bool_vars)
+
 
 def at_most_one_he(bool_vars, name):
     if len(bool_vars) <= 4:
         return And([Not(And(pair[0], pair[1])) for pair in combinations(bool_vars, 2)])
     y = Bool(f"y_{name}")
     return And(And(at_most_one_np(bool_vars[:3] + [y])), And(at_most_one_he(bool_vars[3:] + [Not(y)], name+"_")))
+
 
 def exactly_one_he(bool_vars, name):
     return And(at_most_one_he(bool_vars, name), at_least_one_he(bool_vars))
@@ -46,7 +52,7 @@ def main(args):
     COURIERS = instance['m']
     ITEMS = instance['n']
     MAX_LOAD = instance['l']
-    SIZE = instance['s']
+    SIZE = [0] + instance['s']
     D = instance['D']
     NODES = ITEMS + 1
 
@@ -62,17 +68,19 @@ def main(args):
     TENSOR = [[[Bool(f'x{i}_{j}_{k}') for k in range(COURIERS)] for j in range(NODES)] for i in range(NODES)]
 
     # 1) Vehicle leaves node it enters
-    for j in range(NODES):
-        for k in range(COURIERS):
-            s.add(Sum([TENSOR[i][j][k] for i in range(NODES)]) == Sum([TENSOR[j][i][k] for i in range(NODES)]))
+    for i in range(NODES):
+        for j in range(NODES):
+            for k in range(COURIERS):
+                s.add(Implies(TENSOR[i][j][k], Or([TENSOR[j][h][k] for h in range(NODES)])))
 
-    # 2) Each node is entered just once by any vehicle
+    # 2) Each node is entered and leaved just once by any vehicle
     for j in range(1, NODES):
-        s.add(exactly_one_he([TENSOR[i][j][k] for i in range(NODES) for k in range(COURIERS)], f'valid_node_{j}'))
+        s.add(exactly_one_he([TENSOR[i][j][k] for i in range(NODES) for k in range(COURIERS)], f'valid_n_{j}'))
+        s.add(exactly_one_he([TENSOR[j][i][k] for i in range(NODES) for k in range(COURIERS)], f'valid_node_{j}'))
 
-    # 3) Every vehicle starts from the depot and ends at the depot
+    # 3) Every goes through the depot
     for k in range(COURIERS):
-        s.add(exactly_one_he([TENSOR[0][j][k] for j in range(1, NODES)], f'valid_depot_{k}'))
+        s.add(Or([TENSOR[0][j][k] for j in range(1, NODES)]))
 
     # 4) Capacity constraints
     for k in range(COURIERS):
@@ -128,13 +136,20 @@ def main(args):
         return
 
     else:
+        solved = False
         while True:
+            s.set("timeout", 300_000 - int(time.time() - start)*1000)
+            if time.time() - start > 300:
+                break
             model = s.model()
-            print(model[obj])
+            print(f'Best minimum found so far: {model[obj]}')
             s.add(obj < model[obj])
 
             outcome = s.check()
+            print(outcome)
             if outcome != sat:
+                if outcome == sat:  # can also be unknown
+                    solved = True
                 break
 
         all_paths = []
@@ -155,7 +170,7 @@ def main(args):
             print('\n')
             all_paths.append(path)
 
-        write_json_solution(args.instance, 'SAT', 'z3', int(time.time() - start), str(outcome) == 'sat', model[obj].as_long(), all_paths)
+        write_json_solution(args.instance,  'SAT', 'z3', int(time.time() - start), solved, model[obj].as_long(), all_paths)
 
 
 if __name__ == '__main__':
