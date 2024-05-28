@@ -1,91 +1,97 @@
-include "globals.mzn";
 include "alldifferent.mzn";
-include "bounded_path.mzn";
+include "globals.mzn";
+
+
+% Input variables
+int: couriers;
+int: items;
+int: UPPER_BOUND;
+int :LOWER_BOUND;
+int: DIST_LOWER_BOUND;
 
 % useful sets
 set of int: COURIERS = 1..couriers;
 set of int: ITEMS = 1..items;
-set of int: NODES = 1..items + 2;
-
-% Input data
-
-int: couriers;
-int: items;
-int: n_edges;
+set of int: NODES = 1..items + 1;
 
 array[COURIERS] of int: CAPACITY;
 array[ITEMS] of int: DEMAND;
+array[NODES, NODES] of int: D; 
 
-set of int: GRAPH_EDGES = 1..n_edges;
+% Model variables
+array[COURIERS] of var DIST_LOWER_BOUND..UPPER_BOUND: obj_dist;
+array[COURIERS, NODES] of var NODES: couriers_nodes;
 
-array[GRAPH_EDGES] of NODES: starting_nd;
-array[GRAPH_EDGES] of NODES: ending_nd;
-array[GRAPH_EDGES] of int: weights;
+% objective function
+var LOWER_BOUND..UPPER_BOUND: obj; 
 
-int: LOWER_BOUND;
-int: UPPER_BOUND;
+int: max_load = max(CAPACITY) + 1;
 
-var LOWER_BOUND..UPPER_BOUND: obj;
+array[ITEMS] of var 0..couriers: loads;
 
-% Variables
-array[COURIERS, NODES] of var bool :ns;
-array[COURIERS, GRAPH_EDGES] of var bool :es;
-array[COURIERS] of var 0..UPPER_BOUND: path_dist;
+array[COURIERS] of var 0..max_load: couriers_loads;
 
-% Variable to apply bin packing
-array[ITEMS] of var COURIERS: loads;
 
-% Symmetry breaking variables
-array[NODES, COURIERS] of var bool: symmetry;
-array[COURIERS] of var 0..max(CAPACITY): couriers_loads;
-
-% force the pair ns es to be a sub graph of the original one for each courier, it also
-% computes the total cost of the path (cycle) obtained (see  https://www.minizinc.org/doc-2.5.5/en/lib-globals.html#index-125)
-constraint forall(k in COURIERS)(
-    bounded_dpath(
-            items+2, n_edges, 
-            starting_nd, ending_nd, weights, 
-            1, items+2, [ns[k,i] | i in NODES], [es[k,i] | i in GRAPH_EDGES], path_dist[k])
+% ensure that each courier starts and ends in origin point
+constraint forall(k in COURIERS) (
+    if couriers_nodes[k, items+1] != items+1 then 
+        count([couriers_nodes[k, i] | i in ITEMS], items+1, 1) 
+    else 
+        forall(i in NODES) (couriers_nodes[k, i] == i)  endif
 );
 
-% Ensure that each item is taken care of by a single courier
-constraint forall(i in 2..items+1)(
-       count([ns[k,i] | k in COURIERS], true, 1)
+% each item must be assigned only to one courier
+constraint forall(i in ITEMS)(
+      count([couriers_nodes[k, i]| k in COURIERS], i, couriers-1)
 );
 
-% channelling the loads with the assignments
-constraint forall (k in COURIERS) 
-      (forall(i in 2..items+1)(
-      if ns[k, i] then loads[i-1] = k endif
-));
 
+% setting the loads to verify the load_size for each courier
+constraint forall(k in COURIERS) (
+    forall(i in ITEMS) (
+        if couriers_nodes[k, i] != i then
+            loads[i] = k endif
+    )
+);
 
-
-% Ensure that the weight of all the items assigned to a courier is under the limit
 % ensure that each courier does not exceed the max capacity
-constraint bin_packing_capa(
-                           CAPACITY,
-                           loads,
-                           DEMAND);
+constraint bin_packing_capa(CAPACITY, loads, DEMAND);
+
+% Circuit
+constraint forall(k in COURIERS) (
+      subcircuit([couriers_nodes[k, i] | i in NODES]) 
+);
+
+% distance computation
+constraint forall(k in COURIERS) (
+      obj_dist[k] = sum([D[i, couriers_nodes[k, i]]| i in NODES where couriers_nodes[k, i] != i])
+);
 
 
-% Symmetry breaking
+% Symmetry breaking constraint
 constraint forall(k in COURIERS)(
     couriers_loads[k] = sum(
             [DEMAND[i] | i in ITEMS where loads[i]=k]
     )
 );
 
+% sub tour elimination, if the last courier can carry all the packages
+% then all courier must start
+constraint forall(k in COURIERS) (
+    if CAPACITY[couriers] >= max(DEMAND) then 
+        couriers_nodes[k, items+1] != items+1   
+    endif
+);
 
-% Assign to the symmetry matrix either asg (if lex can be applied) or all zeros
-constraint if forall(k in 1..couriers-1) (CAPACITY[couriers] >= couriers_loads[k]) then 
-            forall(k in COURIERS) (forall(i in NODES) (symmetry[i,k] <-> ns[k, i]))
-           else forall(k in COURIERS) (forall(i in NODES) (symmetry[i,k] <-> false)) endif;
+constraint obj = max(obj_dist);
 
-constraint lex_chain(symmetry);
+solve :: seq_search([
+                int_search(couriers_nodes, first_fail, indomain_min),
+                int_search(loads, first_fail, indomain_min)])
+     minimize(obj);
 
-% Obj setting
-constraint obj = max(path_dist);
+%solve minimize(max(obj_dist));
 
-solve ::  int_search(loads, first_fail, indomain_min)
-  minimize(obj);
+%output [show(obj_dist) ++ "\n"];
+
+%output [show(symmetry[i, 1]) ++ " "| i in NODES]
