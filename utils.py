@@ -211,7 +211,7 @@ def write_json_solution(instance: str, folder: str, solver: str, time: int, opti
 
     return True
 
-def parser_obj():
+if __name__ == '__main__':
     parser  = argparse.ArgumentParser(
         prog='CP OR',
         description='CP OR solver',
@@ -220,14 +220,8 @@ def parser_obj():
 
     parser.add_argument('--instance', type=str, metavar='--i', help='Input instance', required=False)
     parser.add_argument('--runall', help='Run all instances', default=False, required=False, action='store_true')
-    parser.add_argument('--verbose', help='Verbose mode', default=False, required=False, action='store_true')
-    parser.add_argument('--timeout', type=int, metavar='--t', help='Timeout for the solver', default=300, required=False)
-    parser.add_argument('--solver', type=str, metavar='--s', help='Solver to use', choices=['gecode', 'chuffed', 'com.google.ortools.sat'])
-    
-    return parser.parse_args()
+    args = parser.parse_args()
 
-if __name__ == '__main__':
-    args = parser_obj()
     if args.runall:
         for instance in sorted(os.listdir('Instances'), key=lambda x: int(re.search(r'\d+', x).group())):
             if instance.endswith('.dat'):
