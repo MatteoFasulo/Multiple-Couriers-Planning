@@ -1,7 +1,6 @@
 include "alldifferent.mzn";
 include "globals.mzn";
 
-
 % Input variables
 int: couriers;
 int: items;
@@ -27,9 +26,9 @@ var LOWER_BOUND..UPPER_BOUND: obj;
 
 int: max_load = max(CAPACITY) + 1;
 
-array[ITEMS] of var 0..couriers: loads;
+array[ITEMS] of var 1..couriers: loads;
 
-array[COURIERS] of var 0..max_load: couriers_loads;
+array[COURIERS] of var min(DEMAND)..max_load: couriers_loads;
 
 
 % ensure that each courier starts and ends in origin point
@@ -84,14 +83,3 @@ constraint forall(k in COURIERS) (
 );
 
 constraint obj = max(obj_dist);
-
-solve :: seq_search([
-                int_search(couriers_nodes, first_fail, indomain_min),
-                int_search(loads, first_fail, indomain_min)])
-     minimize(obj);
-
-%solve minimize(max(obj_dist));
-
-%output [show(obj_dist) ++ "\n"];
-
-%output [show(symmetry[i, 1]) ++ " "| i in NODES]

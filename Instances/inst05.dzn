@@ -3,7 +3,7 @@ items = 3;
 LOWER_BOUND = 160;
 DIST_LOWER_BOUND = 0;
 UPPER_BOUND = 351;
-CAPACITY = [30, 18];
+CAPACITY = [18, 30];
 DEMAND = [20, 17, 6];
 D = [|0, 21, 86, 99, 
 |21, 0, 71, 80, 

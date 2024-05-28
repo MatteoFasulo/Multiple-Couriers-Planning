@@ -1,21 +1,21 @@
 {
-   "or tools cp-sat": {
-      "time": 0.283385,
+   "chuffed": {
+      "time": 0,
       "optimal": true,
       "obj": 12,
       "sol": [
          [
-            3,
+            5,
             6,
-            5
+            3
          ],
          [
-            2,
-            4
+            4,
+            2
          ],
          [
-            1,
-            7
+            7,
+            1
          ]
       ]
    }

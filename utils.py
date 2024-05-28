@@ -116,7 +116,7 @@ def read_instance(filename: str) -> dict:
     return {
         'm': couriers,
         'n': items,
-        'l': sort_couriers(max_load),
+        'l': max_load,
         's': sizes,
         'D': D,
         'D_symmetric': check_symmetric(D),
