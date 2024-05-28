@@ -1,6 +1,6 @@
 {
-   "or tools cp-sat": {
-      "time": 0.003797,
+   "gecode": {
+      "time": 0,
       "optimal": true,
       "obj": 206,
       "sol": [

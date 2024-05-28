@@ -12,7 +12,7 @@ def check_symmetric(D):
     """
     return np.allclose(D, D.T)
 
-def preprocess(D, depot: int = 0):
+def preprocess(D, depot: int = -1):
     """
     Preprocess the distance matrix
     """
@@ -25,34 +25,17 @@ def preprocess(D, depot: int = 0):
         D = np.delete(D, -1, axis=1)
     return D
 
-def get_nodes_and_weights(D):
-    starting_nodes = []
-    ending_nodes = []
-    weights = []
-    for i in range(1, len(D[0])+1):
-        for j in range(1, len(D[0])+1):
-            if i != j and i < len(D[0]):
-                starting_nodes.append(i+1)
-                ending_nodes.append(j+1)
-                weights.append(D[i-1][j-1])
-            elif i != j:
-                starting_nodes.append(1)
-                ending_nodes.append(j+1)
-                weights.append(D[i-1][j-1])
-            elif i == j and i == len(D[0]):
-                starting_nodes.append(1)
-                ending_nodes.append(len(D[0])+1)
-                weights.append(0)
+def subtour_presence(MAX_LOAD, SIZE) -> bool:
+    """
+    Check if there is a subtour presence
+    """
+    return min(MAX_LOAD) >= max(SIZE)
 
-    return starting_nodes, ending_nodes, weights
-
-def compute_lower_bound(D, MAX_LOAD, SIZE, depot: int = 0):
+def compute_lower_bound(D, MAX_LOAD, SIZE, depot: int = -1):
     """
     Compute the lower bound of the problem
     """
-    smallest_courier_capaciy = min(MAX_LOAD)
-    largest_item_size = max(SIZE)
-
+    subtour = subtour_presence(MAX_LOAD, SIZE)
     if depot == 0:
         # Get the last row and column from the distances matrix
         first_row = D[0]
@@ -72,7 +55,7 @@ def compute_lower_bound(D, MAX_LOAD, SIZE, depot: int = 0):
     lb = np.max([max_value1, max_value2])
 
     # If all_travel is False, set the lower bound for courier distances to 0
-    if not smallest_courier_capaciy >= largest_item_size:
+    if not subtour:
         dist_lb = 0
 
     else:
@@ -86,14 +69,13 @@ def compute_lower_bound(D, MAX_LOAD, SIZE, depot: int = 0):
     # Return the lower bounds
     return lb, dist_lb
 
-def compute_upper_bound(D, MAX_LOAD, SIZE):
+def compute_upper_bound(D, MAX_LOAD, SIZE, depot: int = -1):
     """
     Compute the upper bound of the problem
     """
-    smallest_courier_capaciy = min(MAX_LOAD)
-    largest_item_size = max(SIZE)
+    subtour = subtour_presence(MAX_LOAD, SIZE)
 
-    if not smallest_courier_capaciy >= largest_item_size:
+    if not subtour:
         return sum([max(D[i]) for i in range(len(SIZE)+1)])
 
     else:
@@ -104,12 +86,14 @@ def compute_upper_bound(D, MAX_LOAD, SIZE):
 
 def sort_couriers(MAX_LOAD):
     """
-    Sort the couriers based on their capacity
+    Sort the couriers based on their capacity and return the dictionary
     """
-    return sorted(MAX_LOAD, reverse=True)
+    max_load_dict = {idx: val for idx, val in enumerate(MAX_LOAD)}
+    max_load_dict = dict(sorted(max_load_dict.items(), key=lambda item: item[1], reverse=True))
+    return max_load_dict
     
 
-def read_instance(filename: str) -> dict:
+def read_instance(filename: str, depot: int = -1) -> dict:
     with open(filename, 'r') as file:
         data = file.read().splitlines()
 
@@ -120,33 +104,28 @@ def read_instance(filename: str) -> dict:
     D = [[int(x) for x in line.split()] for line in data[4:]]
 
     # Preprocess the distance matrix
-    D = preprocess(D, depot=-1)
+    D = preprocess(D, depot=depot)
 
-    # Sort the max load in descending order
-    #max_load.sort(reverse=True)
+    # Sort the max load in descending order and save old order
+    #max_load = sort_couriers(max_load)
+    #idxs, values = zip(*max_load.items())
 
     # Sort the items in ascending order
     #sizes.sort()
 
     # Insert 0 demand for the depot
     #sizes.insert(0, 0)
-
-    # Get starting nodes, ending nodes and weights
-    starting_nodes, ending_nodes, weights = get_nodes_and_weights(D)
     
     return {
         'm': couriers,
         'n': items,
-        'l': sort_couriers(max_load),
+        'l': max_load,
         's': sizes,
         'D': D,
         'D_symmetric': check_symmetric(D),
-        'lower_bound': compute_lower_bound(D, max_load, sizes, depot=-1),
-        'upper_bound': compute_upper_bound(D, max_load, sizes),
-        'starting_nodes': starting_nodes,
-        'ending_nodes': ending_nodes,
-        'weights': weights,
-        'num_edges': len(starting_nodes)
+        'lower_bound': compute_lower_bound(D, max_load, sizes, depot=depot),
+        'upper_bound': compute_upper_bound(D, max_load, sizes, depot=depot),
+        #'old_order': list(idxs)
     }
 
 def path_sequence(path, D=None):
@@ -170,36 +149,22 @@ def path_sequence(path, D=None):
         cost += D[i][j]
     return cost
 
-def search_graph_path(starting_nd, ending_nd, es, courier):
-    true_path = {}
-    for j in range(len(es[courier])):
-
-        if es[courier][j]:
-            start_pos = starting_nd[j] - 1
-            end_pos = ending_nd[j] - 1
-            true_path[start_pos] = end_pos
-
-    return true_path
-
 def convert_dat_to_dzn(filename: str):
     instance = read_instance(filename)
     with open(filename.replace('.dat', '.dzn'), 'w') as file:
         file.write(f'couriers = {instance["m"]};\n')
         file.write(f'items = {instance["n"]};\n')
-        file.write(f'n_edges = {instance["num_edges"]};\n')
         file.write(f'LOWER_BOUND = {instance["lower_bound"][0]};\n')
+        file.write(f'DIST_LOWER_BOUND = {instance["lower_bound"][1]};\n')
         file.write(f'UPPER_BOUND = {instance["upper_bound"]};\n')
         file.write(f'CAPACITY = {instance["l"]};\n')
         file.write(f'DEMAND = {instance["s"]};\n')
-        file.write(f'starting_nd = {instance["starting_nodes"]};\n')
-        file.write(f'ending_nd = {instance["ending_nodes"]};\n')
-        file.write(f'weights = {instance["weights"]};\n')
-        #file.write('D = [|')
-        #for row in instance['D']:
-        #    for elem in row:
-        #        file.write(f'{elem}, ')
-        #    file.write(f'\n|')
-        #file.write('];\n')
+        file.write('D = [|')
+        for row in instance['D']:
+            for elem in row:
+                file.write(f'{elem}, ')
+            file.write(f'\n|')
+        file.write('];\n')
 
 def write_json_solution(instance: str, folder: str, solver: str, time: int, optimal: bool, obj: int, sol: list):
     # Extract digit from string
@@ -246,22 +211,17 @@ def write_json_solution(instance: str, folder: str, solver: str, time: int, opti
 
     return True
 
-def parser_obj():
+if __name__ == '__main__':
     parser  = argparse.ArgumentParser(
-        prog='CP OR',
-        description='CP OR solver',
+        prog='Utility for Solvers of Multiple Couriers Problem',
+        description='Utility for Solvers of Multiple Couriers Problem',
         epilog='Developed by: Antonio Gravina, Maksim Omelchenko & Matteo Fasulo'
     )
 
     parser.add_argument('--instance', type=str, metavar='--i', help='Input instance', required=False)
     parser.add_argument('--runall', help='Run all instances', default=False, required=False, action='store_true')
-    parser.add_argument('--verbose', help='Verbose mode', default=False, required=False, action='store_true')
-    parser.add_argument('--timeout', type=int, metavar='--t', help='Timeout for the solver', default=300, required=False)
-    
-    return parser.parse_args()
+    args = parser.parse_args()
 
-if __name__ == '__main__':
-    args = parser_obj()
     if args.runall:
         for instance in sorted(os.listdir('Instances'), key=lambda x: int(re.search(r'\d+', x).group())):
             if instance.endswith('.dat'):

@@ -1,12 +1,13 @@
+import argparse
 import os, re, sys, datetime
 from minizinc import Instance, Model, Solver, Status
 import numpy as np
 
-from utils import *
+from utils import read_instance, write_json_solution
 
 def main(args):
     # Define the solver to use
-    solver = Solver.lookup("com.google.ortools.sat")
+    solver = Solver.lookup(args.solver)
 
     # Get the args from CLI
     if args.instance is None:
@@ -20,31 +21,26 @@ def main(args):
     problem = read_instance(args.instance)
 
     # Instantiate the model using the MiniZinc .mzn file
-    model = Model("new_model.mzn")
-
-    # Add one more constraint if the distance matrix is symmetric
-    # 
-    if problem["D_symmetric"]:
-        model.add_string(
-        r"""
-        constraint forall(k in 1..COURIERS, i in 1..NODES, j in i+1..NODES) (
-            not(TENSOR[1,j,k] /\ TENSOR[i,1,k])
-        );
-        """
-        )
+    model = Model("model.mzn")
 
     if solver == Solver.lookup("gecode"):
         model.add_string(
             r"""
-            solve :: bool_search([TENSOR[i,j,k] | i in 1..NODES, j in 1..NODES, k in 1..COURIERS], first_fail, indomain_min)
-            minimize(obj);
+            solve :: seq_search([
+                    int_search(couriers_nodes, dom_w_deg, indomain_random),
+                    int_search(loads, dom_w_deg, indomain_random)])
+                minimize(obj);
             """
         )
-    else:
+    elif solver == Solver.lookup("chuffed"):
         model.add_string(
             r"""
-            solve ::  int_search(loads, first_fail, indomain_min)
-                    minimize(obj);
+            include "chuffed.mzn";
+            solve :: seq_search([
+                int_search(couriers_nodes, random_order, indomain_min),
+                int_search(loads, random_order, indomain_min)
+                ])
+                minimize(obj);
             """
         )
 
@@ -52,10 +48,6 @@ def main(args):
 
     # Add the .dzn file to the instance input
     instance.add_file(instance_file)
-
-    # Define useful constant to iterate over
-    COURIERS = problem["m"]
-    NODES = problem["n"] + 1
 
     # Solve the instance with a timeout
     result = instance.solve(timeout=datetime.timedelta(seconds=args.timeout))
@@ -65,54 +57,57 @@ def main(args):
         print('No solution found')
         return
 
-    print(result.solution)
-    ns = result.solution.ns
-    es = result.solution.es
-    obj_dist = result.solution.path_dist
-    starting_nd = problem["starting_nodes"]
-    ending_nd = problem["ending_nodes"] 
+    # Retrieve the solution
+    couriers_nodes = result.solution.couriers_nodes
+    time_needed = result.statistics['solveTime'].total_seconds().__floor__()
+    obj = max(result.solution.obj_dist)
+    ITEMS = len(couriers_nodes[0])
+
+    print(np.array(couriers_nodes).reshape(len(couriers_nodes), ITEMS))
+
+    # Reorder the rows of couriers_nodes according to the order saved before sorting capacities in preprocessing
+    #couriers_nodes = [couriers_nodes[i] for i in problem['old_order']]
 
     res = []
-    for k in range(len(ns)):
-        path = search_graph_path(starting_nd, ending_nd, es, k)
-        start_pos = 0
+    for k in range(len(couriers_nodes)):
         asg = []
-        while len(path) != 1:
-            asg.append(path[start_pos])
-            tmp = path[start_pos]
-            path.pop(start_pos)
-            start_pos = tmp
+        start = ITEMS-1
+        second = couriers_nodes[k][start]
+        while second != ITEMS:
+            asg.append(second)
+            start = second - 1
+            second = couriers_nodes[k][start]
         res.append(asg)
 
-    print(res)
+    print(f'Objective value: {obj}')
+    print(f'Time needed: {time_needed} seconds')
+    print(f'Solution: {res}')
+    print(f'Status: {result.status}')
 
-    # Retrieve the solution
-    #TENSOR = result["TENSOR"]
-    #TENSOR = np.array(TENSOR).reshape(NODES, NODES, COURIERS)
-#
-    ## Print the tensor
-    #all_paths = []
-    #for k in range(COURIERS):
-    #    path = []
-    #    for i in range(NODES):
-    #        for j in range(NODES):
-    #            if TENSOR[i][j][k] == 1:
-    #                path.append((i,j))
-    #    path_sequence(path)
-    #    path = [x[1] for x in path[:-1]]
-    #    print(f'Courier: {k}\tPath sequence: {path}')
-    #    print('\n')
-    #    all_paths.append(path)
-#
-    #write_json_solution(args.instance, 'CP', solver.name.lower(), result.statistics['solveTime'].total_seconds(), result.status is Status.OPTIMAL_SOLUTION, result.solution.objective, all_paths)
+    write_json_solution(args.instance, 'CP', solver.name.lower(), time_needed, str(result.status) == 'OPTIMAL_SOLUTION' or 'ALL_SOLUTIONS', obj, res)
 
 if __name__ == '__main__':
-    args = parser_obj()
+    parser  = argparse.ArgumentParser(
+        prog='CP Solver for Multiple Couriers Problem',
+        description='CP Solver for Multiple Couriers Problem',
+        epilog='Developed by: Antonio Gravina, Maksim Omelchenko & Matteo Fasulo'
+    )
+
+    parser.add_argument('--instance', type=str, metavar='--i', help='Input instance', required=False)
+    parser.add_argument('--runall', help='Run all instances', default=False, required=False, action='store_true')
+    parser.add_argument('--timeout', type=int, metavar='--t', help='Timeout for the solver', default=300, required=False)
+    parser.add_argument('--solver', type=str, metavar='--s', help='Solver to use', choices=['gecode', 'chuffed', 'com.google.ortools.sat'])
+    parser.add_argument('--verbose', help='Verbose mode', default=False, required=False, action='store_true')
+    args = parser.parse_args()
+    
     if args.runall:
         for instance in sorted(os.listdir('Instances'), key=lambda x: int(re.search(r'\d+', x).group())):
-            print(instance)
             if instance.endswith('.dat'):
+                print(instance)
                 args.instance = f'Instances{os.sep}{instance}'
                 main(args)
-    else:
+    elif args.instance:
         main(args)
+    else:
+        print('Error: missing instance')
+        exit(1)
