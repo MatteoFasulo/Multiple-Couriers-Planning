@@ -14,7 +14,7 @@ python cp.py --i Instances/inst01.dat --t 60 --solver gecode
 ## Run SAT
 
 ```python
-python smt_or.py --i Instances/inst01.dat
+python sat.py --i Instances/inst01.dat
 ```
 
 ## Run SMT
