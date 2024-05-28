@@ -88,8 +88,8 @@ def main(args):
 
 if __name__ == '__main__':
     parser  = argparse.ArgumentParser(
-        prog='CP OR',
-        description='CP OR solver',
+        prog='CP Solver for Multiple Couriers Problem',
+        description='CP Solver for Multiple Couriers Problem',
         epilog='Developed by: Antonio Gravina, Maksim Omelchenko & Matteo Fasulo'
     )
 

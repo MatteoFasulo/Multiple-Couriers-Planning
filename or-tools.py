@@ -132,8 +132,8 @@ def main(args):
 
 if __name__ == '__main__':
     parser  = argparse.ArgumentParser(
-        prog='CP OR',
-        description='CP OR solver',
+        prog='SAT Solver with Google OR-Tools for Multiple Couriers Problem',
+        description='SAT Solver with Google OR-Tools for Multiple Couriers Problem',
         epilog='Developed by: Antonio Gravina, Maksim Omelchenko & Matteo Fasulo'
     )
 

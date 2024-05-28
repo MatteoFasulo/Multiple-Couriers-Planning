@@ -213,8 +213,8 @@ def write_json_solution(instance: str, folder: str, solver: str, time: int, opti
 
 if __name__ == '__main__':
     parser  = argparse.ArgumentParser(
-        prog='CP OR',
-        description='CP OR solver',
+        prog='Utility for Solvers of Multiple Couriers Problem',
+        description='Utility for Solvers of Multiple Couriers Problem',
         epilog='Developed by: Antonio Gravina, Maksim Omelchenko & Matteo Fasulo'
     )
 
