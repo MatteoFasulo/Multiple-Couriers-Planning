@@ -7,9 +7,6 @@ from ortools.sat.python import cp_model
 from utils import path_sequence, read_instance, write_json_solution
 
 def main(args):
-    if args.instance is None:
-        print('Error: missing instance')
-        sys.exit(1)
     instance = read_instance(args.instance)
 
     COURIERS = instance['m']
@@ -140,7 +137,6 @@ if __name__ == '__main__':
     parser.add_argument('--instance', type=str, metavar='--i', help='Input instance', required=False)
     parser.add_argument('--runall', help='Run all instances', default=False, required=False, action='store_true')
     parser.add_argument('--timeout', type=int, metavar='--t', help='Timeout for the solver', default=300, required=False)
-    parser.add_argument('--solver', type=str, metavar='--s', help='Solver to use', choices=['gecode', 'chuffed', 'com.google.ortools.sat'])
     parser.add_argument('--verbose', help='Verbose mode', default=False, required=False, action='store_true')
     args = parser.parse_args()
 

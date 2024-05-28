@@ -1,7 +1,8 @@
-import os, re, sys, time
+import os, re, sys, time, argparse
 from itertools import combinations
 from z3 import *
-from utils import *
+
+from utils import check_symmetric, compute_lower_bound, compute_upper_bound, path_sequence, preprocess, read_instance, write_json_solution
 
 
 # Naive encoding
@@ -42,10 +43,7 @@ def max_z3(vars):
 
 
 def main(args):
-    if args.instance is None:
-        print('Error: missing instance')
-        sys.exit(1)
-    instance = read_instance(args.instance)
+    instance = read_instance(args.instance, depot=0)
 
     #print("Instance: ", instance)
 
@@ -57,10 +55,9 @@ def main(args):
     NODES = ITEMS + 1
 
     start = time.time()
-    D = preprocess(D)
-    symm = check_symmetric(D)
-    lower_bnd = compute_lower_bound(D, MAX_LOAD, SIZE)
-    upper_bnd = compute_upper_bound(D, NODES)
+    symm = instance['D_symmetric']
+    lower_bnd, _ = instance['lower_bound']
+    upper_bnd = instance['upper_bound']
 
     s = Solver()
     s.set("timeout", 300_000)
@@ -127,7 +124,7 @@ def main(args):
     obj = Int('max_distance')
 
     s.add(obj == max_z3(arr_dist))
-    s.add(obj >= lower_bnd[0])
+    s.add(obj >= lower_bnd)
     s.add(obj <= upper_bnd)
 
     outcome = s.check()
@@ -173,12 +170,25 @@ def main(args):
 
 
 if __name__ == '__main__':
-    args = parser_obj()
+    parser  = argparse.ArgumentParser(
+        prog='SAT Solver with Z3 for Multiple Couriers Problem',
+        description='SAT Solver with Z3 for Multiple Couriers Problem',
+        epilog='Developed by: Antonio Gravina, Maksim Omelchenko & Matteo Fasulo'
+    )
+    parser.add_argument('--instance', type=str, metavar='--i', help='Input instance', required=False)
+    parser.add_argument('--runall', help='Run all instances', default=False, required=False, action='store_true')
+    parser.add_argument('--timeout', type=int, metavar='--t', help='Timeout for the solver', default=300, required=False)
+    parser.add_argument('--verbose', help='Verbose mode', default=False, required=False, action='store_true')
+    args = parser.parse_args()
+
     if args.runall:
         for instance in sorted(os.listdir('Instances'), key=lambda x: int(re.search(r'\d+', x).group())):
             if instance.endswith('.dat'):
                 args.instance = f'Instances{os.sep}{instance}'
                 main(args)
-    else:
+    elif args.instance:
         main(args)
+    else:
+        print('Error: missing instance')
+        exit(1)
 

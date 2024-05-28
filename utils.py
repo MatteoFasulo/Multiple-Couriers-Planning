@@ -12,7 +12,7 @@ def check_symmetric(D):
     """
     return np.allclose(D, D.T)
 
-def preprocess(D, depot: int = 0):
+def preprocess(D, depot: int = -1):
     """
     Preprocess the distance matrix
     """
@@ -31,7 +31,7 @@ def subtour_presence(MAX_LOAD, SIZE) -> bool:
     """
     return min(MAX_LOAD) >= max(SIZE)
 
-def compute_lower_bound(D, MAX_LOAD, SIZE, depot: int = 0):
+def compute_lower_bound(D, MAX_LOAD, SIZE, depot: int = -1):
     """
     Compute the lower bound of the problem
     """
@@ -69,7 +69,7 @@ def compute_lower_bound(D, MAX_LOAD, SIZE, depot: int = 0):
     # Return the lower bounds
     return lb, dist_lb
 
-def compute_upper_bound(D, MAX_LOAD, SIZE):
+def compute_upper_bound(D, MAX_LOAD, SIZE, depot: int = -1):
     """
     Compute the upper bound of the problem
     """
@@ -93,7 +93,7 @@ def sort_couriers(MAX_LOAD):
     return max_load_dict
     
 
-def read_instance(filename: str) -> dict:
+def read_instance(filename: str, depot: int = -1) -> dict:
     with open(filename, 'r') as file:
         data = file.read().splitlines()
 
@@ -104,7 +104,7 @@ def read_instance(filename: str) -> dict:
     D = [[int(x) for x in line.split()] for line in data[4:]]
 
     # Preprocess the distance matrix
-    D = preprocess(D, depot=-1)
+    D = preprocess(D, depot=depot)
 
     # Sort the max load in descending order and save old order
     #max_load = sort_couriers(max_load)
@@ -123,8 +123,8 @@ def read_instance(filename: str) -> dict:
         's': sizes,
         'D': D,
         'D_symmetric': check_symmetric(D),
-        'lower_bound': compute_lower_bound(D, max_load, sizes, depot=-1),
-        'upper_bound': compute_upper_bound(D, max_load, sizes),
+        'lower_bound': compute_lower_bound(D, max_load, sizes, depot=depot),
+        'upper_bound': compute_upper_bound(D, max_load, sizes, depot=depot),
         #'old_order': list(idxs)
     }
 
