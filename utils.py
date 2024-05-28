@@ -86,9 +86,11 @@ def compute_upper_bound(D, MAX_LOAD, SIZE):
 
 def sort_couriers(MAX_LOAD):
     """
-    Sort the couriers based on their capacity
+    Sort the couriers based on their capacity and return the dictionary
     """
-    return sorted(MAX_LOAD, reverse=True)
+    max_load_dict = {idx: val for idx, val in enumerate(MAX_LOAD)}
+    max_load_dict = dict(sorted(max_load_dict.items(), key=lambda item: item[1], reverse=True))
+    return max_load_dict
     
 
 def read_instance(filename: str) -> dict:
@@ -104,8 +106,9 @@ def read_instance(filename: str) -> dict:
     # Preprocess the distance matrix
     D = preprocess(D, depot=-1)
 
-    # Sort the max load in descending order
-    #max_load.sort(reverse=True)
+    # Sort the max load in descending order and save old order
+    #max_load = sort_couriers(max_load)
+    #idxs, values = zip(*max_load.items())
 
     # Sort the items in ascending order
     #sizes.sort()
@@ -122,6 +125,7 @@ def read_instance(filename: str) -> dict:
         'D_symmetric': check_symmetric(D),
         'lower_bound': compute_lower_bound(D, max_load, sizes, depot=-1),
         'upper_bound': compute_upper_bound(D, max_load, sizes),
+        #'old_order': list(idxs)
     }
 
 def path_sequence(path, D=None):
@@ -144,17 +148,6 @@ def path_sequence(path, D=None):
     for i,j in path:
         cost += D[i][j]
     return cost
-
-def search_graph_path(starting_nd, ending_nd, es, courier):
-    true_path = {}
-    for j in range(len(es[courier])):
-
-        if es[courier][j]:
-            start_pos = starting_nd[j] - 1
-            end_pos = ending_nd[j] - 1
-            true_path[start_pos] = end_pos
-
-    return true_path
 
 def convert_dat_to_dzn(filename: str):
     instance = read_instance(filename)
@@ -229,6 +222,7 @@ def parser_obj():
     parser.add_argument('--runall', help='Run all instances', default=False, required=False, action='store_true')
     parser.add_argument('--verbose', help='Verbose mode', default=False, required=False, action='store_true')
     parser.add_argument('--timeout', type=int, metavar='--t', help='Timeout for the solver', default=300, required=False)
+    parser.add_argument('--solver', type=str, metavar='--s', help='Solver to use', choices=['gecode', 'chuffed', 'com.google.ortools.sat'])
     
     return parser.parse_args()
 

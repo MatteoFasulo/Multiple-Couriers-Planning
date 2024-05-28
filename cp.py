@@ -6,7 +6,7 @@ from utils import *
 
 def main(args):
     # Define the solver to use
-    solver = Solver.lookup("chuffed")
+    solver = Solver.lookup(args.solver)
 
     # Get the args from CLI
     if args.instance is None:
@@ -20,7 +20,7 @@ def main(args):
     problem = read_instance(args.instance)
 
     # Instantiate the model using the MiniZinc .mzn file
-    model = Model("new_model.mzn")
+    model = Model("model.mzn")
 
     if solver == Solver.lookup("gecode"):
         model.add_string(
@@ -28,7 +28,7 @@ def main(args):
             solve :: seq_search([
                     int_search(couriers_nodes, dom_w_deg, indomain_random),
                     int_search(loads, dom_w_deg, indomain_random)])
-                    minimize(obj);
+                minimize(obj);
             """
         )
     elif solver == Solver.lookup("chuffed"):
@@ -62,6 +62,11 @@ def main(args):
     obj = max(result.solution.obj_dist)
     ITEMS = len(couriers_nodes[0])
 
+    print(np.array(couriers_nodes).reshape(len(couriers_nodes), ITEMS))
+
+    # Reorder the rows of couriers_nodes according to the order saved before sorting capacities in preprocessing
+    #couriers_nodes = [couriers_nodes[i] for i in problem['old_order']]
+
     res = []
     for k in range(len(couriers_nodes)):
         asg = []
@@ -76,15 +81,16 @@ def main(args):
     print(f'Objective value: {obj}')
     print(f'Time needed: {time_needed} seconds')
     print(f'Solution: {res}')
+    print(f'Status: {result.status}')
 
-    write_json_solution(args.instance, 'CP', solver.name.lower(), time_needed, result.status is Status.OPTIMAL_SOLUTION, obj, res)
+    write_json_solution(args.instance, 'CP', solver.name.lower(), time_needed, str(result.status) == 'OPTIMAL_SOLUTION' or 'ALL_SOLUTIONS', obj, res)
 
 if __name__ == '__main__':
     args = parser_obj()
     if args.runall:
         for instance in sorted(os.listdir('Instances'), key=lambda x: int(re.search(r'\d+', x).group())):
-            print(instance)
             if instance.endswith('.dat'):
+                print(instance)
                 args.instance = f'Instances{os.sep}{instance}'
                 main(args)
     else:

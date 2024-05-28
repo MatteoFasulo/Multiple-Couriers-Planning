@@ -4,8 +4,11 @@ Multiple Couriers Planning (MCP)
 
 ## Run CP (with MiniZinc Python binding)
 
+Time can be specified in seconds with the `--t` option.
+Solver can be specified with the `--solver` option. The default solver is `gecode`. Supported options are `gecode`, `chuffed`, `com.google.ortools.sat`.
+
 ```python
-python cp.py --i Instances/inst01.dat
+python cp.py --i Instances/inst01.dat --t 60 --solver gecode
 ```
 
 ## Run SAT
