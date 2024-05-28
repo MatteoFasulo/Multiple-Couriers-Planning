@@ -33,10 +33,7 @@ array[COURIERS] of var min(DEMAND)..max_load: couriers_loads;
 
 % ensure that each courier starts and ends in origin point
 constraint forall(k in COURIERS) (
-    if couriers_nodes[k, items+1] != items+1 then 
-        count([couriers_nodes[k, i] | i in ITEMS], items+1, 1) 
-    else 
-        forall(i in NODES) (couriers_nodes[k, i] == i)  endif
+      count([couriers_nodes[k, i] | i in ITEMS], items+1, 1)  /\ couriers_nodes[k, items+1] != items+1
 );
 
 % each item must be assigned only to one courier
@@ -44,13 +41,21 @@ constraint forall(i in ITEMS)(
       count([couriers_nodes[k, i]| k in COURIERS], i, couriers-1)
 );
 
-
 % setting the loads to verify the load_size for each courier
 constraint forall(k in COURIERS) (
     forall(i in ITEMS) (
         if couriers_nodes[k, i] != i then
             loads[i] = k endif
     )
+);
+
+% Remove possible swaps of couriers having same capacity
+constraint forall(k in COURIERS)(
+    forall (k2 in k+1..couriers-1) (
+        if CAPACITY[k] = CAPACITY[k2] then
+            couriers_nodes[k, items+1] < couriers_nodes[k2, items+1]
+        endif
+    )  
 );
 
 % ensure that each courier does not exceed the max capacity
@@ -76,10 +81,12 @@ constraint forall(k in COURIERS)(
 
 % sub tour elimination, if the last courier can carry all the packages
 % then all courier must start
+/*
 constraint forall(k in COURIERS) (
     if CAPACITY[couriers] >= max(DEMAND) then 
         couriers_nodes[k, items+1] != items+1   
     endif
 );
+*/
 
 constraint obj = max(obj_dist);

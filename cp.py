@@ -23,6 +23,21 @@ def main(args):
     # Instantiate the model using the MiniZinc .mzn file
     model = Model("model.mzn")
 
+    if problem["D_symmetric"]:
+        model.add_string(
+            r"""
+            % Symmetry breaking for symmetric matrices
+            % Order of traversing the tour
+            constraint forall(k in COURIERS) (
+                forall(i in ITEMS) (
+                    if couriers_nodes[k, i] = items+1 then
+                        i < couriers_nodes[k, items+1]
+                    endif
+                )
+            );
+            """
+        )
+
     if solver == Solver.lookup("gecode"):
         model.add_string(
             r"""
@@ -50,7 +65,7 @@ def main(args):
     instance.add_file(instance_file)
 
     # Solve the instance with a timeout
-    result = instance.solve(timeout=datetime.timedelta(seconds=args.timeout))
+    result = instance.solve(timeout=datetime.timedelta(seconds=args.timeout), random_seed=args.seed)
 
     # Check if a solution has been found
     if result.status is Status.UNKNOWN or result.status is Status.UNSATISFIABLE:
@@ -98,6 +113,8 @@ if __name__ == '__main__':
     parser.add_argument('--timeout', type=int, metavar='--t', help='Timeout for the solver', default=300, required=False)
     parser.add_argument('--solver', type=str, metavar='--s', help='Solver to use', choices=['gecode', 'chuffed', 'com.google.ortools.sat'])
     parser.add_argument('--verbose', help='Verbose mode', default=False, required=False, action='store_true')
+    parser.add_argument('--seed', type=int, help='Set seed for solving', default=42, required=False)
+
     args = parser.parse_args()
     
     if args.runall:
