@@ -52,7 +52,7 @@ constraint forall(k in COURIERS) (
 % Remove possible swaps of couriers having same capacity
 constraint forall(k in COURIERS)(
     forall (k2 in k+1..couriers-1) (
-        if CAPACITY[k] = CAPACITY[k2] then
+        if abs(CAPACITY[k] - CAPACITY[k2]) < min(DEMAND) then
             couriers_nodes[k, items+1] < couriers_nodes[k2, items+1]
         endif
     )  

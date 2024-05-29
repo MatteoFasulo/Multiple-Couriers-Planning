@@ -2,7 +2,7 @@ import os, re, sys, time, argparse
 from itertools import combinations
 from z3 import *
 
-from utils import check_symmetric, compute_lower_bound, compute_upper_bound, path_sequence, preprocess, read_instance, write_json_solution
+from utils import path_sequence, read_instance, write_json_solution
 
 
 # Naive encoding
@@ -105,7 +105,7 @@ def main(args):
     # 7) size symmetry breaking:
     for k1 in range(COURIERS):
         for k2 in range(k1 + 1, COURIERS):
-            if MAX_LOAD[k1] == MAX_LOAD[k2]:
+            if abs(MAX_LOAD[k1] - MAX_LOAD[k2]) < min(SIZE):
                 for i in range(NODES):
                     for j in range(i + 1, NODES):
                         s.add(Not(And(TENSOR[0][j][k1], TENSOR[0][i][k2])))

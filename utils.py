@@ -38,12 +38,12 @@ def compute_lower_bound(D, MAX_LOAD, SIZE, depot: int = -1):
     subtour = subtour_presence(MAX_LOAD, SIZE)
     if depot == 0:
         # Get the last row and column from the distances matrix
-        first_row = D[0]
-        first_column = [D[i][0] for i in range(len(D[0]))]
+        first_row = D[0, :]
+        first_column = D[:,0]
 
     else:
-        last_row = D[-1]
-        last_column = [D[i][-1] for i in range(len(D[0]))]
+        last_row = D[-1, :]
+        last_column = D[:,-1]
         first_row = last_row
         first_column = last_column
         
@@ -54,17 +54,12 @@ def compute_lower_bound(D, MAX_LOAD, SIZE, depot: int = -1):
     # The lower bound is the maximum of these two values
     lb = np.max([max_value1, max_value2])
 
-    # If all_travel is False, set the lower bound for courier distances to 0
-    if not subtour:
-        dist_lb = 0
+    # Calculate the minimum values for the last row and column
+    min_value1 = first_column[np.argmin(first_row[np.nonzero(first_row)])] + np.min(first_row[np.nonzero(first_row)])
+    min_value2 = first_row[np.argmin(first_column[np.nonzero(first_column)])] + np.min(first_column[np.nonzero(first_column)])
 
-    else:
-        # Otherwise, calculate the minimum values for the last row and column
-        min_value1 = first_column[np.argmin(first_row)] + np.min(first_row)
-        min_value2 = first_row[np.argmin(first_column)] + np.min(first_column)
-
-        # The lower bound for courier distances is the minimum of these two values
-        dist_lb = np.min([min_value1, min_value2]) 
+    # The lower bound for courier distances is the minimum of these two values
+    dist_lb = np.min([min_value1, min_value2]) 
 
     # Return the lower bounds
     return lb, dist_lb

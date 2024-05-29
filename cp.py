@@ -39,22 +39,34 @@ def main(args):
         )
 
     if solver == Solver.lookup("gecode") or solver == Solver.lookup("com.google.ortools.sat"):
-        model.add_string(
-            r"""
-            solve :: seq_search([
-                    int_search(couriers_nodes, dom_w_deg, indomain_random),
-                    int_search(loads, dom_w_deg, indomain_random)])
-                minimize(obj);
-            """
-        )
+        if problem["D_symmetric"]:
+            model.add_string(
+                r"""
+                solve :: seq_search([
+                    int_search(couriers_nodes, first_fail, indomain_random),
+                    int_search(loads, first_fail, indomain_min)])
+                :: restart_luby(100)
+                :: relax_and_reconstruct(loads, 70)
+                    minimize(obj);
+                """
+            )
+        else:
+            model.add_string(
+                r"""
+                solve :: seq_search([
+                    int_search(couriers_nodes, first_fail, indomain_min),
+                    int_search(loads, first_fail, indomain_min)])
+                    minimize(obj);
+                """
+            )
+
     elif solver == Solver.lookup("chuffed"):
         model.add_string(
             r"""
             include "chuffed.mzn";
             solve :: seq_search([
                 int_search(couriers_nodes, random_order, indomain_min),
-                int_search(loads, random_order, indomain_min)
-                ])
+                int_search(loads, random_order, indomain_min)])
                 minimize(obj);
             """
         )
