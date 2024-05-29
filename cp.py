@@ -38,7 +38,7 @@ def main(args):
             """
         )
 
-    if solver == Solver.lookup("gecode"):
+    if solver == Solver.lookup("gecode") or solver == Solver.lookup("com.google.ortools.sat"):
         model.add_string(
             r"""
             solve :: seq_search([
@@ -58,6 +58,13 @@ def main(args):
                 minimize(obj);
             """
         )
+    
+    else:
+        model.add_string(
+            r"""
+            solve minimize(obj);
+            """
+        )
 
     instance = Instance(solver, model)
 
@@ -65,7 +72,11 @@ def main(args):
     instance.add_file(instance_file)
 
     # Solve the instance with a timeout
-    result = instance.solve(timeout=datetime.timedelta(seconds=args.timeout), random_seed=args.seed)
+    free_search_strategy = True
+    if solver == Solver.lookup("gecode"):
+        free_search_strategy = False
+
+    result = instance.solve(timeout=datetime.timedelta(seconds=args.timeout), random_seed=args.seed, free_search=free_search_strategy)
 
     # Check if a solution has been found
     if result.status is Status.UNKNOWN or result.status is Status.UNSATISFIABLE:
@@ -77,6 +88,7 @@ def main(args):
     time_needed = result.statistics['solveTime'].total_seconds().__floor__()
     obj = max(result.solution.obj_dist)
     ITEMS = len(couriers_nodes[0])
+    optimal_sol = str(result.status) == 'OPTIMAL_SOLUTION'
 
     print(np.array(couriers_nodes).reshape(len(couriers_nodes), ITEMS))
 
@@ -99,7 +111,7 @@ def main(args):
     print(f'Solution: {res}')
     print(f'Status: {result.status}')
 
-    write_json_solution(args.instance, 'CP', solver.name.lower(), time_needed, str(result.status) == 'OPTIMAL_SOLUTION' or 'ALL_SOLUTIONS', obj, res)
+    write_json_solution(args.instance, 'CP', solver.name.lower(), time_needed, optimal_sol, obj, res)
 
 if __name__ == '__main__':
     parser  = argparse.ArgumentParser(

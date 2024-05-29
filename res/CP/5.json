@@ -1,5 +1,5 @@
 {
-   "gecode": {
+   "or tools cp-sat": {
       "time": 0,
       "optimal": true,
       "obj": 206,
