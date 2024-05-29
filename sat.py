@@ -81,7 +81,7 @@ def main(args):
 
     # 4) Capacity constraints
     for k in range(COURIERS):
-        s.add(Sum([SIZE[j] * TENSOR[i][j][k] for j in range(1, NODES) for i in range(NODES)]) <= MAX_LOAD[k])
+        s.add(Sum([SIZE[j] * If(TENSOR[i][j][k], 1, 0) for j in range(1, NODES) for i in range(NODES)]) <= MAX_LOAD[k])
 
     # 5) Remove self-loops
     for i in range(NODES):
