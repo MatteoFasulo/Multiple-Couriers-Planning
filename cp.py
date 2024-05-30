@@ -20,6 +20,12 @@ def main(args):
     # Retrieve the instance .dat file for checking properties
     problem = read_instance(args.instance)
 
+    # Get the dimensionality of couriers and nodes
+    couriers = problem['m']
+    items = problem['n']
+    nodes = items + 1
+    size_of_problem = couriers * nodes
+
     # Instantiate the model using the MiniZinc .mzn file
     model = Model("model.mzn")
 
@@ -61,15 +67,27 @@ def main(args):
             )
 
     elif solver == Solver.lookup("chuffed"):
-        model.add_string(
-            r"""
-            include "chuffed.mzn";
-            solve :: seq_search([
-                int_search(couriers_nodes, random_order, indomain_min),
-                int_search(loads, random_order, indomain_min)])
-                minimize(obj);
-            """
-        )
+        if size_of_problem < 1000:
+            model.add_string(
+                r"""
+                include "chuffed.mzn";
+                solve :: seq_search([
+                    int_search(couriers_nodes, first_fail, indomain_min),
+                    int_search(loads, first_fail, indomain_min)])
+                    minimize(obj);
+                """
+            )
+        elif size_of_problem >= 1000:
+            model.add_string(
+                r"""
+                include "chuffed.mzn";
+                solve :: seq_search([
+                    int_search(couriers_nodes, random_order, indomain_min),
+                    int_search(loads, first_fail, indomain_min)])
+                :: restart_luby(100)
+                    minimize(obj);
+                """
+            )
     
     else:
         model.add_string(
@@ -90,19 +108,25 @@ def main(args):
 
     result = instance.solve(timeout=datetime.timedelta(seconds=args.timeout), random_seed=args.seed, free_search=free_search_strategy)
 
+    print(result)
+
     # Check if a solution has been found
     if result.status is Status.UNKNOWN or result.status is Status.UNSATISFIABLE:
         print('No solution found')
         return
 
     # Retrieve the solution
+    print(result.statistics)
     couriers_nodes = result.solution.couriers_nodes
-    time_needed = result.statistics['solveTime'].total_seconds().__floor__()
+    if solver == Solver.lookup("gecode"):
+        time_needed = result.statistics['solveTime'].total_seconds().__floor__()
+    elif solver == Solver.lookup("chuffed"):
+        time_needed = result.statistics['time'].total_seconds().__floor__()
     obj = max(result.solution.obj_dist)
     ITEMS = len(couriers_nodes[0])
     optimal_sol = str(result.status) == 'OPTIMAL_SOLUTION'
 
-    print(np.array(couriers_nodes).reshape(len(couriers_nodes), ITEMS))
+    #print(np.array(couriers_nodes).reshape(len(couriers_nodes), ITEMS))
 
     # Reorder the rows of couriers_nodes according to the order saved before sorting capacities in preprocessing
     #couriers_nodes = [couriers_nodes[i] for i in problem['old_order']]

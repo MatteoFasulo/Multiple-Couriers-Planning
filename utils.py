@@ -31,53 +31,52 @@ def subtour_presence(MAX_LOAD, SIZE) -> bool:
     """
     return min(MAX_LOAD) >= max(SIZE)
 
-def compute_lower_bound(D, MAX_LOAD, SIZE, depot: int = -1):
+def compute_lower_bound(D, depot: int = -1):
     """
     Compute the lower bound of the problem
     """
-    subtour = subtour_presence(MAX_LOAD, SIZE)
-    if depot == 0:
-        # Get the last row and column from the distances matrix
-        first_row = D[0, :]
-        first_column = D[:,0]
+    # Select the first row and column if depot is 0, else select the last row and column
+    row = D[0, :] if depot == 0 else D[-1, :]
+    column = D[:, 0] if depot == 0 else D[:, -1]
 
-    else:
-        last_row = D[-1, :]
-        last_column = D[:,-1]
-        first_row = last_row
-        first_column = last_column
-        
-    # Calculate the maximum values for the last row and column
-    max_value1 = first_column[np.argmax(first_row)] + np.max(first_row)
-    max_value2 = first_row[np.argmax(first_column)] + np.max(first_column)
+    # Calculate the maximum indices for the row and column
+    max_idx_row = np.argmax(row)
+    max_idx_column = np.argmax(column)
 
     # The lower bound is the maximum of these two values
-    lb = np.max([max_value1, max_value2])
+    lb = max(column[max_idx_row] + np.max(row), row[max_idx_column] + np.max(column))
 
-    # Calculate the minimum values for the last row and column
-    min_value1 = first_column[np.argmin(first_row[np.nonzero(first_row)])] + np.min(first_row[np.nonzero(first_row)])
-    min_value2 = first_row[np.argmin(first_column[np.nonzero(first_column)])] + np.min(first_column[np.nonzero(first_column)])
+    # Get the non-zero elements of the row and column
+    nonzero_row = row[np.nonzero(row)]
+    nonzero_column = column[np.nonzero(column)]
+
+    # Calculate the minimum indices for the row and column
+    min_idx_row = np.argmin(nonzero_row)
+    min_idx_column = np.argmin(nonzero_column)
 
     # The lower bound for courier distances is the minimum of these two values
-    dist_lb = np.min([min_value1, min_value2]) 
+    dist_lb = min(column[min_idx_row] + np.min(nonzero_row), row[min_idx_column] + np.min(nonzero_column))
 
     # Return the lower bounds
     return lb, dist_lb
 
-def compute_upper_bound(D, MAX_LOAD, SIZE, depot: int = -1):
+
+def compute_upper_bound(D, MAX_LOAD):
     """
     Compute the upper bound of the problem
     """
-    subtour = subtour_presence(MAX_LOAD, SIZE)
+    COURIERS = len(MAX_LOAD)
+    # Calculate the maximum value per row
+    max_per_row = np.max(D, axis=1)
+    # Sort the maximum values
+    sorted_arr = np.sort(max_per_row)
+    # Get the first n-couriers+1 values where n is the number of nodes and couriers is the number of couriers
+    # This accounts for the case where one courier makes almost all the deliveries and the rest make only one
+    sliced_arr = sorted_arr[COURIERS-1:]
+    # Sum the sliced values
+    val = np.sum(sliced_arr)
 
-    if not subtour:
-        return sum([max(D[i]) for i in range(len(SIZE)+1)])
-
-    else:
-        D_sorted = D[np.max(D, axis=0).argsort()]
-        max_long_path = sum([max(D_sorted[i]) for i in range(len(MAX_LOAD)-1, len(SIZE)+1)])
-
-        return int(max_long_path)
+    return val
 
 def sort_couriers(MAX_LOAD):
     """
@@ -118,8 +117,8 @@ def read_instance(filename: str, depot: int = -1) -> dict:
         's': sizes,
         'D': D,
         'D_symmetric': check_symmetric(D),
-        'lower_bound': compute_lower_bound(D, max_load, sizes, depot=depot),
-        'upper_bound': compute_upper_bound(D, max_load, sizes, depot=depot),
+        'lower_bound': compute_lower_bound(D, depot=depot),
+        'upper_bound': compute_upper_bound(D, max_load),
         #'old_order': list(idxs)
     }
 
