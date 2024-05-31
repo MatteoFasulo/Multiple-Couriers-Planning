@@ -37,7 +37,7 @@ def main(args):
             constraint forall(k in COURIERS) (
                 forall(i in ITEMS) (
                     if couriers_nodes[k, i] = items+1 then
-                        i < couriers_nodes[k, items+1]
+                        i <= couriers_nodes[k, items+1]
                     endif
                 )
             );
@@ -84,7 +84,7 @@ def main(args):
                 solve :: seq_search([
                     int_search(couriers_nodes, random_order, indomain_min),
                     int_search(loads, first_fail, indomain_min)])
-                :: restart_luby(100)
+                :: restart_luby(1000)
                     minimize(obj);
                 """
             )

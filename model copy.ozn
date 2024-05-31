@@ -1,0 +1,11 @@
+output ["\"output\": {","\"dzn\": ",showJSON(concat(["obj_dist = ",showDzn(obj_dist),";\n","couriers_nodes = \n",let {array [int] of string: X_INTRODUCED_36961_ = [], array [int] of string: X_INTRODUCED_36962_ = [], array [int,int] of string: X_INTRODUCED_36963_ = [(X_INTRODUCED_36959_, X_INTRODUCED_36960_) : showDzn(couriers_nodes[X_INTRODUCED_36959_,X_INTRODUCED_36960_]) | X_INTRODUCED_36959_ in index_set_1of2(couriers_nodes), X_INTRODUCED_36960_ in index_set_2of2(couriers_nodes)]} in (show2d_indexed(X_INTRODUCED_36961_,X_INTRODUCED_36962_,X_INTRODUCED_36963_)),";\n","obj = ",showDzn(obj),";\n","loads = ",showDzn(loads),";\n","couriers_loads = ",showDzn(couriers_loads),";\n","_objective = ",showDzn(_objective),";\n"])),"}, \"sections\": [\"dzn\"]"];
+int: obj;
+int: _objective = obj;
+set of int: COURIERS = 1..20;
+set of int: ITEMS = 1..47;
+array [COURIERS] of int: couriers_loads;
+array [ITEMS] of int: loads;
+set of int: NODES = 1..48;
+array [1..960] of int: X_INTRODUCED_36_;
+array [COURIERS,NODES] of int: couriers_nodes = array2d(1..20,1..48,X_INTRODUCED_36_);
+array [COURIERS] of int: obj_dist;

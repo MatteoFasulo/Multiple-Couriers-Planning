@@ -1,11 +1,11 @@
-include "alldifferent.mzn";
 include "globals.mzn";
+include "chuffed.mzn";
 
 % Input variables
 int: couriers;
 int: items;
 int: UPPER_BOUND;
-int :LOWER_BOUND;
+int: LOWER_BOUND;
 int: DIST_LOWER_BOUND;
 
 % useful sets
@@ -26,14 +26,14 @@ var LOWER_BOUND..UPPER_BOUND: obj;
 
 int: max_load = max(CAPACITY) + 1;
 
-array[ITEMS] of var 1..couriers: loads;
+array[ITEMS] of var 0..couriers: loads;
 
-array[COURIERS] of var min(DEMAND)..max_load: couriers_loads;
+array[COURIERS] of var min(DEMAND)..min(CAPACITY): couriers_loads;
 
 
 % ensure that each courier starts and ends in origin point
 constraint forall(k in COURIERS) (
-      count([couriers_nodes[k, i] | i in ITEMS], items+1, 1)  /\ couriers_nodes[k, items+1] != items+1
+      count([couriers_nodes[k, i] | i in ITEMS], items+1, 1) /\ couriers_nodes[k, items+1] != items+1
 );
 
 % each item must be assigned only to one courier
@@ -45,9 +45,11 @@ constraint forall(i in ITEMS)(
 constraint forall(k in COURIERS) (
     forall(i in ITEMS) (
         if couriers_nodes[k, i] != i then
-            loads[i] = k endif
+            loads[i] = k 
+        endif
     )
 );
+
 
 % Remove possible swaps of couriers having same capacity
 constraint forall(k in COURIERS)(
@@ -79,4 +81,24 @@ constraint forall(k in COURIERS)(
     )
 );
 
+
 constraint obj = max(obj_dist);
+
+
+% Symmetry breaking for symmetric matrices
+% Order of traversing the tour
+
+constraint forall(k in COURIERS) (
+    forall(i in ITEMS) (
+        if couriers_nodes[k, i] = items+1 then
+            i <= couriers_nodes[k, items+1]
+        endif
+    )
+);
+
+
+solve :: seq_search([
+                    int_search(couriers_nodes, random_order, indomain_min),
+                    int_search(loads, first_fail, indomain_min)])
+:: restart_luby(1000)
+                    minimize(obj);
