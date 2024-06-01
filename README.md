@@ -23,6 +23,12 @@ python sat.py --i Instances/inst01.dat
 ```python
 ```
 
+## Run MIP
+
+```python
+python mip.py --i Instances/inst01.dat
+```
+
 ## Check Solution
 
 ```python
