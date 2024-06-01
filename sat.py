@@ -75,20 +75,20 @@ def main(args):
         s.add(exactly_one_he([TENSOR[i][j][k] for i in range(NODES) for k in range(COURIERS)], f'valid_n_{j}'))
         s.add(exactly_one_he([TENSOR[j][i][k] for i in range(NODES) for k in range(COURIERS)], f'valid_node_{j}'))
 
-    # 3) Every goes through the depot
+    # 3) Every goes through the depot once
     for k in range(COURIERS):
-        s.add(Or([TENSOR[0][j][k] for j in range(1, NODES)]))
+        s.add(exactly_one_he([TENSOR[0][j][k] for j in range(1, NODES)], f'depot_in_{k}'))
 
-    # 4) Capacity constraints
-    for k in range(COURIERS):
-        s.add(Sum([SIZE[j] * If(TENSOR[i][j][k], 1, 0) for j in range(1, NODES) for i in range(NODES)]) <= MAX_LOAD[k])
-
-    # 5) Remove self-loops
+    # 4) Remove self-loops
     for i in range(NODES):
         for k in range(COURIERS):
             s.add(Not(TENSOR[i][i][k]))
 
-    # 6) Miller-Tucker-Zemlin formulation (MTZ)
+    # 5) Capacity constraints
+    for k in range(COURIERS):
+        s.add(Sum([SIZE[j] * If(TENSOR[i][j][k], 1, 0) for j in range(1, NODES) for i in range(NODES)]) <= MAX_LOAD[k])
+
+    # 6) subtour elimination Miller-Tucker-Zemlin formulation
     u = [Int(f'u_{i}') for i in range(NODES)]
     Q = max(MAX_LOAD)
 
@@ -136,15 +136,15 @@ def main(args):
         solved = False
         while True:
             s.set("timeout", 300_000 - int(time.time() - start)*1000)
-            if time.time() - start > 300:
-                break
+
             model = s.model()
+
             print(f'Best minimum found so far: {model[obj]}')
             s.add(obj < model[obj])
 
             outcome = s.check()
             if outcome != sat:
-                if outcome == unsat:  # can also be unsat
+                if outcome == unsat:  # can also be unknown
                     solved = True
                 break
 
