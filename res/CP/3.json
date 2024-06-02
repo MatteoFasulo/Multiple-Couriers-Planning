@@ -1,5 +1,65 @@
 {
-   "chuffed": {
+   "gecode default": {
+      "time": 1,
+      "optimal": true,
+      "obj": 12,
+      "sol": [
+         [
+            5,
+            4,
+            2
+         ],
+         [
+            3,
+            7
+         ],
+         [
+            1,
+            6
+         ]
+      ]
+   },
+   "gecode SB": {
+      "time": 0,
+      "optimal": true,
+      "obj": 12,
+      "sol": [
+         [
+            5,
+            4,
+            2
+         ],
+         [
+            3,
+            7
+         ],
+         [
+            1,
+            6
+         ]
+      ]
+   },
+   "chuffed default": {
+      "time": 0,
+      "optimal": true,
+      "obj": 12,
+      "sol": [
+         [
+            3,
+            6,
+            5
+         ],
+         [
+            2,
+            4
+         ],
+         [
+            1,
+            7
+         ]
+      ]
+   },
+   "chuffed SB": {
       "time": 0,
       "optimal": true,
       "obj": 12,

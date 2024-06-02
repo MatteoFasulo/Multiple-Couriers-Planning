@@ -143,8 +143,8 @@ def path_sequence(path, D=None):
         cost += D[i][j]
     return cost
 
-def convert_dat_to_dzn(filename: str):
-    instance = read_instance(filename)
+def convert_dat_to_dzn(filename: str, depot: int):
+    instance = read_instance(filename, depot=depot)
     with open(filename.replace('.dat', '.dzn'), 'w') as file:
         file.write(f'couriers = {instance["m"]};\n')
         file.write(f'items = {instance["n"]};\n')
@@ -165,35 +165,23 @@ def write_json_solution(instance: str, folder: str, solver: str, time: int, opti
     num = int(re.search(r'\d+', instance).group())
 
     # read the json file as a dictionary 
-    if os.path.exists(f'{os.getcwd()}{os.sep}res{os.sep}{folder}{os.sep}{num}.json'):
-        with open(f'{os.getcwd()}{os.sep}res{os.sep}{folder}{os.sep}{num}.json', 'r') as file:
+    json_file = f'{os.getcwd()}{os.sep}res{os.sep}{folder}{os.sep}{num}.json'
+    if os.path.exists(json_file):
+        with open(json_file, 'r') as file:
             data = json.load(file)
-        
-        # Check if the same solver is present in the json file
-        if solver in data:
-            with open(f'{os.getcwd()}{os.sep}res{os.sep}{folder}{os.sep}{num}.json', 'w') as file:
-                json.dump({
-                    solver:{ 
-                        'time': time,
-                        'optimal': optimal,
-                        'obj': obj,
-                        'sol': sol
-                    }
-                }, file, indent=3)
-            return False
-        else:
-            data[solver] = {
-                'time': time,
-                'optimal': optimal,
-                'obj': obj,
-                'sol': sol
-            }
-            with open(f'{os.getcwd()}{os.sep}res{os.sep}{folder}{os.sep}{num}.json', 'w') as file:
-                json.dump(data, file, indent=3)
+
+        data[solver] = {
+            'time': time,
+            'optimal': optimal,
+            'obj': obj,
+            'sol': sol
+        }
+        with open(json_file, 'w') as file:
+            json.dump(data, file, indent=3)
 
     # Create a new json file, first entry for that instance
     else:
-        with open(f'{os.getcwd()}{os.sep}res{os.sep}{folder}{os.sep}{num}.json', 'w') as file:
+        with open(json_file, 'w') as file:
             json.dump({
                 solver: {
                     'time': time,
@@ -214,15 +202,16 @@ if __name__ == '__main__':
 
     parser.add_argument('--instance', type=str, metavar='--i', help='Input instance', required=False)
     parser.add_argument('--runall', help='Run all instances', default=False, required=False, action='store_true')
+    parser.add_argument('--depot', type=int, metavar='--d', help='Depot index', default=-1, required=False)
     args = parser.parse_args()
 
     if args.runall:
         for instance in sorted(os.listdir('Instances'), key=lambda x: int(re.search(r'\d+', x).group())):
             if instance.endswith('.dat'):
                 args.instance = f'Instances{os.sep}{instance}'
-                convert_dat_to_dzn(args.instance)
+                convert_dat_to_dzn(args.instance, depot=args.depot)
     elif args.instance:
-        convert_dat_to_dzn(args.instance)
+        convert_dat_to_dzn(args.instance, depot=args.depot)
     else:
         print('Error: missing instance')
         exit(1)

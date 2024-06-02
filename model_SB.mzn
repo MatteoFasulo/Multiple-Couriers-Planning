@@ -1,5 +1,4 @@
 include "globals.mzn";
-include "chuffed.mzn";
 
 % Input variables
 int: couriers;
@@ -26,38 +25,27 @@ var LOWER_BOUND..UPPER_BOUND: obj;
 
 int: max_load = max(CAPACITY) + 1;
 
-array[ITEMS] of var 0..couriers: loads;
+array[ITEMS] of var 1..couriers: loads;
 
-array[COURIERS] of var min(DEMAND)..min(CAPACITY): couriers_loads;
+array[COURIERS] of var min(DEMAND)..max_load: couriers_loads;
 
 
-% ensure that each courier starts and ends in origin point
+% Each courier starts and ends in depot
 constraint forall(k in COURIERS) (
-      count([couriers_nodes[k, i] | i in ITEMS], items+1, 1) /\ couriers_nodes[k, items+1] != items+1
+      count([couriers_nodes[k, i] | i in ITEMS], items+1, 1)  /\ couriers_nodes[k, items+1] != items+1
 );
 
-% each item must be assigned only to one courier
+% Each item must be assigned to one courier
 constraint forall(i in ITEMS)(
       count([couriers_nodes[k, i]| k in COURIERS], i, couriers-1)
 );
 
-% setting the loads to verify the load_size for each courier
+% Initialize the loads array
 constraint forall(k in COURIERS) (
     forall(i in ITEMS) (
         if couriers_nodes[k, i] != i then
-            loads[i] = k 
-        endif
+            loads[i] = k endif
     )
-);
-
-
-% Remove possible swaps of couriers having same capacity
-constraint forall(k in COURIERS)(
-    forall (k2 in k+1..couriers-1) (
-        if abs(CAPACITY[k] - CAPACITY[k2]) < min(DEMAND) then
-            couriers_nodes[k, items+1] < couriers_nodes[k2, items+1]
-        endif
-    )  
 );
 
 % ensure that each courier does not exceed the max capacity
@@ -74,7 +62,7 @@ constraint forall(k in COURIERS) (
 );
 
 
-% Symmetry breaking constraint
+% Make sure that the couriers_loads array contains the sum of the loads of the items assigned to each courier
 constraint forall(k in COURIERS)(
     couriers_loads[k] = sum(
             [DEMAND[i] | i in ITEMS where loads[i]=k]
@@ -82,23 +70,24 @@ constraint forall(k in COURIERS)(
 );
 
 
-constraint obj = max(obj_dist);
-
-
-% Symmetry breaking for symmetric matrices
-% Order of traversing the tour
-
-constraint forall(k in COURIERS) (
-    forall(i in ITEMS) (
-        if couriers_nodes[k, i] = items+1 then
-            i <= couriers_nodes[k, items+1]
+% Symmetry breaking: couriers have the same max capacity => tours can be swapped (2)
+constraint forall(k in COURIERS)(
+    forall (k2 in k+1..couriers-1) (
+        if CAPACITY[k] = CAPACITY[k2] then
+            couriers_nodes[k, items+1] < couriers_nodes[k2, items+1]
         endif
-    )
+    )  
 );
 
+/*
+% Symmetry breaking: (3)
+constraint forall(k1 in COURIERS)(
+    forall (k2 in COURIERS) (
+        if CAPACITY[k1] < CAPACITY[k2] then
+            couriers_loads[k1] <= couriers_loads[k2]
+        endif
+    )  
+);
+*/
 
-solve :: seq_search([
-                    int_search(couriers_nodes, random_order, indomain_min),
-                    int_search(loads, first_fail, indomain_min)])
-:: restart_luby(1000)
-                    minimize(obj);
+constraint obj = max(obj_dist);
