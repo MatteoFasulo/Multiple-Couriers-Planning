@@ -133,44 +133,45 @@ def main(args):
         print('No solution found')
         return
 
-    solved = False
-    while True:
-        s.set("timeout", 300_000 - int(time.time() - start)*1000)
+    else:
+        solved = False
+        while True:
+            s.set("timeout", 300_000 - int(time.time() - start)*1000)
 
-        model = s.model()
+            model = s.model()
 
-        print(f'Best minimum found so far: {model[obj]}')
-        s.add(obj < model[obj])
+            print(f'Best minimum found so far: {model[obj]}')
+            s.add(obj < model[obj])
 
-        outcome = s.check()
-        if outcome != sat:
-            if outcome == unsat:  # can also be unknown
-                solved = True
-            break
+            outcome = s.check()
+            if outcome != sat:
+                if outcome == unsat:  # can also be unknown
+                    solved = True
+                break
 
-    all_paths = []
-    max_cost = 0
-    for k in range(COURIERS):
-        path = []
-        for i in range(NODES):
-            for j in range(NODES):
-                if model[TENSOR[i][j][k]]:
-                    path.append((i, j))
-        cost = path_sequence(path, D)
+        all_paths = []
+        max_cost = 0
+        for k in range(COURIERS):
+            path = []
+            for i in range(NODES):
+                for j in range(NODES):
+                    if model[TENSOR[i][j][k]]:
+                        path.append((i, j))
+            cost = path_sequence(path, D)
 
-        if cost > max_cost:
-            max_cost = cost
+            if cost > max_cost:
+                max_cost = cost
 
-        path = [x[1] for x in path[:-1]]
-        print(f'Courier: {k}\tPath sequence: {path}\t cost: {cost}')
-        print('\n')
-        all_paths.append(path)
+            path = [x[1] for x in path[:-1]]
+            print(f'Courier: {k}\tPath sequence: {path}\t cost: {cost}')
+            print('\n')
+            all_paths.append(path)
 
-    time_needed = int(time.time() - start)
+        time_needed = int(time.time() - start)
 
-    write_json_solution(args.instance,  'SAT', 'z3', time_needed, solved, model[obj].as_long(), all_paths)
+        write_json_solution(args.instance,  'SAT', 'z3', time_needed, solved, model[obj].as_long(), all_paths)
 
-    return args.instance, time_needed, model[obj].as_long()
+        return args.instance, time_needed, model[obj].as_long()
 
 
 if __name__ == '__main__':
