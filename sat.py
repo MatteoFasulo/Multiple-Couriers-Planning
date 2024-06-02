@@ -1,8 +1,9 @@
+from concurrent.futures import ProcessPoolExecutor
 import os, re, sys, time, argparse
 from itertools import combinations
 from z3 import *
 
-from utils import check_symmetric, compute_lower_bound, compute_upper_bound, path_sequence, preprocess, read_instance, write_json_solution
+from utils import path_sequence, read_instance, write_json_solution
 
 
 # Naive encoding
@@ -43,14 +44,14 @@ def max_z3(vars):
 
 
 def main(args):
-    instance = read_instance(args.instance, depot=0)
-
-    #print("Instance: ", instance)
+    if args.verbose:
+        print(f"Running instance {instance_args.instance}")
+    instance = read_instance(args.instance, depot=0, padded_size=True)
 
     COURIERS = instance['m']
     ITEMS = instance['n']
     MAX_LOAD = instance['l']
-    SIZE = [0] + instance['s']
+    SIZE = instance['s']
     D = instance['D']
     NODES = ITEMS + 1
 
@@ -60,7 +61,7 @@ def main(args):
     upper_bnd = instance['upper_bound']
 
     s = Solver()
-    s.set("timeout", 300_000)
+    s.set("timeout", 300_000, "seed", args.seed)
 
     TENSOR = [[[Bool(f'x{i}_{j}_{k}') for k in range(COURIERS)] for j in range(NODES)] for i in range(NODES)]
 
@@ -166,7 +167,11 @@ def main(args):
             print('\n')
             all_paths.append(path)
 
-        write_json_solution(args.instance,  'SAT', 'z3', int(time.time() - start), solved, model[obj].as_long(), all_paths)
+        time_needed = int(time.time() - start)
+
+        write_json_solution(args.instance,  'SAT', 'z3', time_needed, solved, model[obj].as_long(), all_paths)
+
+        return args.instance, time_needed, model[obj].as_long()
 
 
 if __name__ == '__main__':
@@ -178,14 +183,25 @@ if __name__ == '__main__':
     parser.add_argument('--instance', type=str, metavar='--i', help='Input instance', required=False)
     parser.add_argument('--runall', help='Run all instances', default=False, required=False, action='store_true')
     parser.add_argument('--timeout', type=int, metavar='--t', help='Timeout for the solver', default=300, required=False)
+    parser.add_argument('--seed', type=int, help='Set seed for solving', default=42, required=False)
+    parser.add_argument('--model', type=str, metavar='--m', help='Model to use', choices=['default', 'SB'], default='default')
     parser.add_argument('--verbose', help='Verbose mode', default=False, required=False, action='store_true')
     args = parser.parse_args()
 
     if args.runall:
-        for instance in sorted(os.listdir('Instances'), key=lambda x: int(re.search(r'\d+', x).group())):
-            if instance.endswith('.dat'):
-                args.instance = f'Instances{os.sep}{instance}'
-                main(args)
+        with ProcessPoolExecutor(max_workers=os.cpu_count()//2) as executor:
+            futures = []
+            instances = sorted(os.listdir('Instances'), key=lambda x: int(re.search(r'\d+', x).group()))
+            instances = [inst for inst in instances if inst.endswith('.dat')]
+            for instance in instances:
+                instance_args = copy.deepcopy(args)
+                instance_args.instance = f'Instances{os.sep}{instance}'
+                futures.append(executor.submit(main, instance_args))
+            # Collect the results
+            results = [future.result() for future in futures]
+
+            print(results)
+
     elif args.instance:
         main(args)
     else:

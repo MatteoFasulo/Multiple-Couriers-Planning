@@ -1,23 +1,23 @@
 import os
 import re
-import sys
 import argparse
 from ortools.sat.python import cp_model
 
 from utils import path_sequence, read_instance, write_json_solution
 
 def main(args):
-    instance = read_instance(args.instance)
+    instance = read_instance(args.instance, depot=0, padded_size=True)
 
     COURIERS = instance['m']
     ITEMS = instance['n']
     MAX_LOAD = instance['l']
-    SIZE = [0] + instance['s']
+    SIZE = instance['s']
     D = instance['D']
     NODES = ITEMS + 1
 
-    lower_bound = instance['lower_bound'][0]
-    upper_bound = instance['upper_bound']
+    symm = instance['D_symmetric']
+    lower_bnd, _ = instance['lower_bound']
+    upper_bnd = instance['upper_bound']
 
     model = cp_model.CpModel()
 
@@ -38,7 +38,8 @@ def main(args):
 
     # 2) Each node is entered just once by any vehicle
     for j in range(1, NODES):
-        model.AddExactlyOne([TENSOR[i][j][k] for i in range(NODES) for k in range(COURIERS)]) # TODO: at least one here if the courier can go the two tours (???)
+        model.AddExactlyOne([TENSOR[i][j][k] for i in range(NODES) for k in range(COURIERS)])
+        model.AddExactlyOne([TENSOR[j][i][k] for i in range(NODES) for k in range(COURIERS)])
 
     # 3) Every vehicle starts from the depot and ends at the depot
     for k in range(COURIERS):
@@ -66,19 +67,19 @@ def main(args):
                     model.Add(u[j] - u[i] >= SIZE[j] - Q*(1 - TENSOR[i][j][k]))
 
     # 6) All the items must be collected
-    #for i in range(1, NODES):
-    #    model.add(sum(TENSOR[i][j][k] for j in range(NODES) for k in range(COURIERS)) == 1)
+    for i in range(1, NODES):
+        model.add(sum(TENSOR[i][j][k] for j in range(NODES) for k in range(COURIERS)) == 1)
 
     # 7) size symmetry breaking:
     for k1 in range(COURIERS):
         for k2 in range(k1 + 1, COURIERS):
-            if MAX_LOAD[k1] == MAX_LOAD[k2]:
+            if abs(MAX_LOAD[k1] - MAX_LOAD[k2]) < min(SIZE):
                 for i in range(NODES):
                     for j in range(i + 1, NODES):
                         model.AddAtMostOne(TENSOR[0][j][k1], TENSOR[0][i][k2])
 
     # 8) Path symmetry breaking for symmetric matrix only
-    if instance['D_symmetric']:
+    if symm:
         for k in range(COURIERS):
             for i in range(NODES):
                 for j in range(i + 1, NODES):
@@ -89,7 +90,7 @@ def main(args):
     for k in range(COURIERS):
         arr_dist.append(sum(D[i][j] * TENSOR[i][j][k] for i in range(NODES) for j in range(NODES)))
 
-    obj = model.NewIntVar(lower_bound, upper_bound, 'max_distance')
+    obj = model.NewIntVar(lower_bnd, upper_bnd, 'max_distance')
             
     model.AddMaxEquality(obj, arr_dist)
 
@@ -101,7 +102,7 @@ def main(args):
     if args.verbose:
         solver.parameters.log_search_progress = True
     solver.parameters.num_search_workers = 12
-    if instance['D_symmetric']:
+    if symm:
         solver.parameters.symmetry_level = 3
     status = solver.Solve(model)
 

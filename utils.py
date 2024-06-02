@@ -25,75 +25,54 @@ def preprocess(D, depot: int = -1):
         D = np.delete(D, -1, axis=1)
     return D
 
-def subtour_presence(MAX_LOAD, SIZE) -> bool:
-    """
-    Check if there is a subtour presence
-    """
-    return min(MAX_LOAD) >= max(SIZE)
-
-def compute_lower_bound(D, MAX_LOAD, SIZE, depot: int = -1):
+def compute_lower_bound(D, depot: int = -1):
     """
     Compute the lower bound of the problem
     """
-    subtour = subtour_presence(MAX_LOAD, SIZE)
-    if depot == 0:
-        # Get the last row and column from the distances matrix
-        first_row = D[0]
-        first_column = [D[i][0] for i in range(len(D[0]))]
+    # Select the first row and column if depot is 0, else select the last row and column
+    row = D[0, :] if depot == 0 else D[-1, :]
+    column = D[:, 0] if depot == 0 else D[:, -1]
 
-    else:
-        last_row = D[-1]
-        last_column = [D[i][-1] for i in range(len(D[0]))]
-        first_row = last_row
-        first_column = last_column
-        
-    # Calculate the maximum values for the last row and column
-    max_value1 = first_column[np.argmax(first_row)] + np.max(first_row)
-    max_value2 = first_row[np.argmax(first_column)] + np.max(first_column)
+    # Calculate the maximum indices for the row and column
+    max_idx_row = np.argmax(row)
+    max_idx_column = np.argmax(column)
 
     # The lower bound is the maximum of these two values
-    lb = np.max([max_value1, max_value2])
+    lb = max(column[max_idx_row] + np.max(row), row[max_idx_column] + np.max(column))
 
-    # If all_travel is False, set the lower bound for courier distances to 0
-    if not subtour:
-        dist_lb = 0
+    # Get the non-zero elements of the row and column
+    nonzero_row = row[np.nonzero(row)]
+    nonzero_column = column[np.nonzero(column)]
 
-    else:
-        # Otherwise, calculate the minimum values for the last row and column
-        min_value1 = first_column[np.argmin(first_row)] + np.min(first_row)
-        min_value2 = first_row[np.argmin(first_column)] + np.min(first_column)
+    # Calculate the minimum indices for the row and column
+    min_idx_row = np.argmin(nonzero_row)
+    min_idx_column = np.argmin(nonzero_column)
 
-        # The lower bound for courier distances is the minimum of these two values
-        dist_lb = np.min([min_value1, min_value2]) 
+    # The lower bound for courier distances is the minimum of these two values
+    dist_lb = min(column[min_idx_row] + np.min(nonzero_row), row[min_idx_column] + np.min(nonzero_column))
 
     # Return the lower bounds
     return lb, dist_lb
 
-def compute_upper_bound(D, MAX_LOAD, SIZE, depot: int = -1):
+
+def compute_upper_bound(D, MAX_LOAD):
     """
     Compute the upper bound of the problem
     """
-    subtour = subtour_presence(MAX_LOAD, SIZE)
+    COURIERS = len(MAX_LOAD)
+    # Calculate the maximum value per row
+    max_per_row = np.max(D, axis=1)
+    # Sort the maximum values
+    sorted_arr = np.sort(max_per_row)
+    # Get the first n-couriers+1 values where n is the number of nodes and couriers is the number of couriers
+    # This accounts for the case where one courier makes almost all the deliveries and the rest make only one
+    sliced_arr = sorted_arr[COURIERS-1:]
+    # Sum the sliced values
+    val = np.sum(sliced_arr)
 
-    if not subtour:
-        return sum([max(D[i]) for i in range(len(SIZE)+1)])
+    return val
 
-    else:
-        D_sorted = D[np.max(D, axis=0).argsort()]
-        max_long_path = sum([max(D_sorted[i]) for i in range(len(MAX_LOAD)-1, len(SIZE)+1)])
-
-        return int(max_long_path)
-
-def sort_couriers(MAX_LOAD):
-    """
-    Sort the couriers based on their capacity and return the dictionary
-    """
-    max_load_dict = {idx: val for idx, val in enumerate(MAX_LOAD)}
-    max_load_dict = dict(sorted(max_load_dict.items(), key=lambda item: item[1], reverse=True))
-    return max_load_dict
-    
-
-def read_instance(filename: str, depot: int = -1) -> dict:
+def read_instance(filename: str, depot: int = -1, padded_size: bool = False) -> dict:
     with open(filename, 'r') as file:
         data = file.read().splitlines()
 
@@ -106,15 +85,9 @@ def read_instance(filename: str, depot: int = -1) -> dict:
     # Preprocess the distance matrix
     D = preprocess(D, depot=depot)
 
-    # Sort the max load in descending order and save old order
-    #max_load = sort_couriers(max_load)
-    #idxs, values = zip(*max_load.items())
-
-    # Sort the items in ascending order
-    #sizes.sort()
-
-    # Insert 0 demand for the depot
-    #sizes.insert(0, 0)
+    if padded_size:
+        # Insert 0 demand for the depot
+        sizes.insert(0, 0)
     
     return {
         'm': couriers,
@@ -123,8 +96,8 @@ def read_instance(filename: str, depot: int = -1) -> dict:
         's': sizes,
         'D': D,
         'D_symmetric': check_symmetric(D),
-        'lower_bound': compute_lower_bound(D, max_load, sizes, depot=depot),
-        'upper_bound': compute_upper_bound(D, max_load, sizes, depot=depot),
+        'lower_bound': compute_lower_bound(D, depot=depot),
+        'upper_bound': compute_upper_bound(D, max_load),
         #'old_order': list(idxs)
     }
 
@@ -149,8 +122,8 @@ def path_sequence(path, D=None):
         cost += D[i][j]
     return cost
 
-def convert_dat_to_dzn(filename: str):
-    instance = read_instance(filename)
+def convert_dat_to_dzn(filename: str, depot: int):
+    instance = read_instance(filename, depot=depot)
     with open(filename.replace('.dat', '.dzn'), 'w') as file:
         file.write(f'couriers = {instance["m"]};\n')
         file.write(f'items = {instance["n"]};\n')
@@ -171,35 +144,23 @@ def write_json_solution(instance: str, folder: str, solver: str, time: int, opti
     num = int(re.search(r'\d+', instance).group())
 
     # read the json file as a dictionary 
-    if os.path.exists(f'{os.getcwd()}{os.sep}res{os.sep}{folder}{os.sep}{num}.json'):
-        with open(f'{os.getcwd()}{os.sep}res{os.sep}{folder}{os.sep}{num}.json', 'r') as file:
+    json_file = f'{os.getcwd()}{os.sep}res{os.sep}{folder}{os.sep}{num}.json'
+    if os.path.exists(json_file):
+        with open(json_file, 'r') as file:
             data = json.load(file)
-        
-        # Check if the same solver is present in the json file
-        if solver in data:
-            with open(f'{os.getcwd()}{os.sep}res{os.sep}{folder}{os.sep}{num}.json', 'w') as file:
-                json.dump({
-                    solver:{ 
-                        'time': time,
-                        'optimal': optimal,
-                        'obj': obj,
-                        'sol': sol
-                    }
-                }, file, indent=3)
-            return False
-        else:
-            data[solver] = {
-                'time': time,
-                'optimal': optimal,
-                'obj': obj,
-                'sol': sol
-            }
-            with open(f'{os.getcwd()}{os.sep}res{os.sep}{folder}{os.sep}{num}.json', 'w') as file:
-                json.dump(data, file, indent=3)
+
+        data[solver] = {
+            'time': time,
+            'optimal': optimal,
+            'obj': obj,
+            'sol': sol
+        }
+        with open(json_file, 'w') as file:
+            json.dump(data, file, indent=3)
 
     # Create a new json file, first entry for that instance
     else:
-        with open(f'{os.getcwd()}{os.sep}res{os.sep}{folder}{os.sep}{num}.json', 'w') as file:
+        with open(json_file, 'w') as file:
             json.dump({
                 solver: {
                     'time': time,
@@ -220,15 +181,16 @@ if __name__ == '__main__':
 
     parser.add_argument('--instance', type=str, metavar='--i', help='Input instance', required=False)
     parser.add_argument('--runall', help='Run all instances', default=False, required=False, action='store_true')
+    parser.add_argument('--depot', type=int, metavar='--d', help='Depot index', default=-1, required=False)
     args = parser.parse_args()
 
     if args.runall:
         for instance in sorted(os.listdir('Instances'), key=lambda x: int(re.search(r'\d+', x).group())):
             if instance.endswith('.dat'):
                 args.instance = f'Instances{os.sep}{instance}'
-                convert_dat_to_dzn(args.instance)
+                convert_dat_to_dzn(args.instance, depot=args.depot)
     elif args.instance:
-        convert_dat_to_dzn(args.instance)
+        convert_dat_to_dzn(args.instance, depot=args.depot)
     else:
         print('Error: missing instance')
         exit(1)

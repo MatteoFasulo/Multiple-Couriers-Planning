@@ -69,4 +69,25 @@ constraint forall(k in COURIERS)(
     )
 );
 
+
+% Symmetry breaking: couriers have the same max capacity => tours can be swapped (2)
+constraint forall(k in COURIERS)(
+    forall (k2 in k+1..couriers-1) (
+        if CAPACITY[k] = CAPACITY[k2] then
+            couriers_nodes[k, items+1] < couriers_nodes[k2, items+1]
+        endif
+    )  
+);
+
+/*
+% Symmetry breaking: (3)
+constraint forall(k1 in COURIERS)(
+    forall (k2 in COURIERS) (
+        if CAPACITY[k1] < CAPACITY[k2] then
+            couriers_loads[k1] <= couriers_loads[k2]
+        endif
+    )  
+);
+*/
+
 constraint obj = max(obj_dist);

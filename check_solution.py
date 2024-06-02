@@ -41,7 +41,7 @@ def main(args):
         continue
       results = read_json_file(folder + '/' + results_file)
       print(f'\tChecking results for instance {results_file}')
-      inst_number = re.search('\d+', results_file).group()
+      inst_number = re.search(r'\d+', results_file).group()
       if len(inst_number) == 1:
         inst_number = '0' + inst_number
       inst_path = args[1] + '/inst' + inst_number + '.dat'
