@@ -25,12 +25,6 @@ def preprocess(D, depot: int = -1):
         D = np.delete(D, -1, axis=1)
     return D
 
-def subtour_presence(MAX_LOAD, SIZE) -> bool:
-    """
-    Check if there is a subtour presence
-    """
-    return min(MAX_LOAD) >= max(SIZE)
-
 def compute_lower_bound(D, depot: int = -1):
     """
     Compute the lower bound of the problem
@@ -78,16 +72,7 @@ def compute_upper_bound(D, MAX_LOAD):
 
     return val
 
-def sort_couriers(MAX_LOAD):
-    """
-    Sort the couriers based on their capacity and return the dictionary
-    """
-    max_load_dict = {idx: val for idx, val in enumerate(MAX_LOAD)}
-    max_load_dict = dict(sorted(max_load_dict.items(), key=lambda item: item[1], reverse=True))
-    return max_load_dict
-    
-
-def read_instance(filename: str, depot: int = -1) -> dict:
+def read_instance(filename: str, depot: int = -1, padded_size: bool = False) -> dict:
     with open(filename, 'r') as file:
         data = file.read().splitlines()
 
@@ -100,15 +85,9 @@ def read_instance(filename: str, depot: int = -1) -> dict:
     # Preprocess the distance matrix
     D = preprocess(D, depot=depot)
 
-    # Sort the max load in descending order and save old order
-    #max_load = sort_couriers(max_load)
-    #idxs, values = zip(*max_load.items())
-
-    # Sort the items in ascending order
-    #sizes.sort()
-
-    # Insert 0 demand for the depot
-    #sizes.insert(0, 0)
+    if padded_size:
+        # Insert 0 demand for the depot
+        sizes.insert(0, 0)
     
     return {
         'm': couriers,

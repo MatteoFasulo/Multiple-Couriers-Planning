@@ -1,3 +1,4 @@
+from concurrent.futures import ProcessPoolExecutor
 import os, re, sys, time, argparse
 from itertools import combinations
 from z3 import *
@@ -43,14 +44,14 @@ def max_z3(vars):
 
 
 def main(args):
-    instance = read_instance(args.instance, depot=0)
-
-    #print("Instance: ", instance)
+    if args.verbose:
+        print(f"Running instance {instance_args.instance}")
+    instance = read_instance(args.instance, depot=0, padded_size=True)
 
     COURIERS = instance['m']
     ITEMS = instance['n']
     MAX_LOAD = instance['l']
-    SIZE = [0] + instance['s']
+    SIZE = instance['s']
     D = instance['D']
     NODES = ITEMS + 1
 
@@ -60,7 +61,7 @@ def main(args):
     upper_bnd = instance['upper_bound']
 
     s = Solver()
-    s.set("timeout", 300_000)
+    s.set("timeout", 300_000, "seed", args.seed)
 
     TENSOR = [[[Bool(f'x{i}_{j}_{k}') for k in range(COURIERS)] for j in range(NODES)] for i in range(NODES)]
 
@@ -75,20 +76,20 @@ def main(args):
         s.add(exactly_one_he([TENSOR[i][j][k] for i in range(NODES) for k in range(COURIERS)], f'valid_n_{j}'))
         s.add(exactly_one_he([TENSOR[j][i][k] for i in range(NODES) for k in range(COURIERS)], f'valid_node_{j}'))
 
-    # 3) Every goes through the depot
+    # 3) Every goes through the depot once
     for k in range(COURIERS):
-        s.add(Or([TENSOR[0][j][k] for j in range(1, NODES)]))
+        s.add(exactly_one_he([TENSOR[0][j][k] for j in range(1, NODES)], f'depot_in_{k}'))
 
-    # 4) Capacity constraints
-    for k in range(COURIERS):
-        s.add(Sum([SIZE[j] * If(TENSOR[i][j][k], 1, 0) for j in range(1, NODES) for i in range(NODES)]) <= MAX_LOAD[k])
-
-    # 5) Remove self-loops
+    # 4) Remove self-loops
     for i in range(NODES):
         for k in range(COURIERS):
             s.add(Not(TENSOR[i][i][k]))
 
-    # 6) Miller-Tucker-Zemlin formulation (MTZ)
+    # 5) Capacity constraints
+    for k in range(COURIERS):
+        s.add(Sum([SIZE[j] * If(TENSOR[i][j][k], 1, 0) for j in range(1, NODES) for i in range(NODES)]) <= MAX_LOAD[k])
+
+    # 6) subtour elimination Miller-Tucker-Zemlin formulation
     u = [Int(f'u_{i}') for i in range(NODES)]
     Q = max(MAX_LOAD)
 
@@ -105,7 +106,7 @@ def main(args):
     # 7) size symmetry breaking:
     for k1 in range(COURIERS):
         for k2 in range(k1 + 1, COURIERS):
-            if abs(MAX_LOAD[k1] - MAX_LOAD[k2]) < min(SIZE):
+            if MAX_LOAD[k1] == MAX_LOAD[k2]:
                 for i in range(NODES):
                     for j in range(i + 1, NODES):
                         s.add(Not(And(TENSOR[0][j][k1], TENSOR[0][i][k2])))
@@ -132,41 +133,44 @@ def main(args):
         print('No solution found')
         return
 
-    else:
-        solved = False
-        while True:
-            s.set("timeout", 300_000 - int(time.time() - start)*1000)
-            if time.time() - start > 300:
-                break
-            model = s.model()
-            print(f'Best minimum found so far: {model[obj]}')
-            s.add(obj < model[obj])
+    solved = False
+    while True:
+        s.set("timeout", 300_000 - int(time.time() - start)*1000)
 
-            outcome = s.check()
-            if outcome != sat:
-                if outcome == unsat:  # can also be unsat
-                    solved = True
-                break
+        model = s.model()
 
-        all_paths = []
-        max_cost = 0
-        for k in range(COURIERS):
-            path = []
-            for i in range(NODES):
-                for j in range(NODES):
-                    if model[TENSOR[i][j][k]]:
-                        path.append((i, j))
-            cost = path_sequence(path, D)
+        print(f'Best minimum found so far: {model[obj]}')
+        s.add(obj < model[obj])
 
-            if cost > max_cost:
-                max_cost = cost
+        outcome = s.check()
+        if outcome != sat:
+            if outcome == unsat:  # can also be unknown
+                solved = True
+            break
 
-            path = [x[1] for x in path[:-1]]
-            print(f'Courier: {k}\tPath sequence: {path}\t cost: {cost}')
-            print('\n')
-            all_paths.append(path)
+    all_paths = []
+    max_cost = 0
+    for k in range(COURIERS):
+        path = []
+        for i in range(NODES):
+            for j in range(NODES):
+                if model[TENSOR[i][j][k]]:
+                    path.append((i, j))
+        cost = path_sequence(path, D)
 
-        write_json_solution(args.instance,  'SAT', 'z3', int(time.time() - start), solved, model[obj].as_long(), all_paths)
+        if cost > max_cost:
+            max_cost = cost
+
+        path = [x[1] for x in path[:-1]]
+        print(f'Courier: {k}\tPath sequence: {path}\t cost: {cost}')
+        print('\n')
+        all_paths.append(path)
+
+    time_needed = int(time.time() - start)
+
+    write_json_solution(args.instance,  'SAT', 'z3', time_needed, solved, model[obj].as_long(), all_paths)
+
+    return args.instance, time_needed, model[obj].as_long()
 
 
 if __name__ == '__main__':
@@ -178,14 +182,25 @@ if __name__ == '__main__':
     parser.add_argument('--instance', type=str, metavar='--i', help='Input instance', required=False)
     parser.add_argument('--runall', help='Run all instances', default=False, required=False, action='store_true')
     parser.add_argument('--timeout', type=int, metavar='--t', help='Timeout for the solver', default=300, required=False)
+    parser.add_argument('--seed', type=int, help='Set seed for solving', default=42, required=False)
+    parser.add_argument('--model', type=str, metavar='--m', help='Model to use', choices=['default', 'SB'], default='default')
     parser.add_argument('--verbose', help='Verbose mode', default=False, required=False, action='store_true')
     args = parser.parse_args()
 
     if args.runall:
-        for instance in sorted(os.listdir('Instances'), key=lambda x: int(re.search(r'\d+', x).group())):
-            if instance.endswith('.dat'):
-                args.instance = f'Instances{os.sep}{instance}'
-                main(args)
+        with ProcessPoolExecutor(max_workers=os.cpu_count()//2) as executor:
+            futures = []
+            instances = sorted(os.listdir('Instances'), key=lambda x: int(re.search(r'\d+', x).group()))
+            instances = [inst for inst in instances if inst.endswith('.dat')]
+            for instance in instances:
+                instance_args = copy.deepcopy(args)
+                instance_args.instance = f'Instances{os.sep}{instance}'
+                futures.append(executor.submit(main, instance_args))
+            # Collect the results
+            results = [future.result() for future in futures]
+
+            print(results)
+
     elif args.instance:
         main(args)
     else:

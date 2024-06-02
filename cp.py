@@ -8,6 +8,9 @@ from concurrent.futures import ProcessPoolExecutor
 from utils import read_instance, write_json_solution
 
 def main(args):
+    if args.verbose:
+        print(f"Running instance {instance_args.instance} with {args.solver} solver and {args.model} model")
+
     # Define the solver to use
     solver = Solver.lookup(args.solver)
 
@@ -180,7 +183,6 @@ if __name__ == '__main__':
             for instance in instances:
                 instance_args = copy.deepcopy(args)
                 instance_args.instance = f'Instances{os.sep}{instance}'
-                print(f"Running instance {instance_args.instance} with model {instance_args.model}")
                 futures.append(executor.submit(main, instance_args))
             # Collect the results
             results = [future.result() for future in futures]

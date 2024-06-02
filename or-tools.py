@@ -1,18 +1,17 @@
 import os
 import re
-import sys
 import argparse
 from ortools.sat.python import cp_model
 
 from utils import path_sequence, read_instance, write_json_solution
 
 def main(args):
-    instance = read_instance(args.instance, depot=0)
+    instance = read_instance(args.instance, depot=0, padded_size=True)
 
     COURIERS = instance['m']
     ITEMS = instance['n']
     MAX_LOAD = instance['l']
-    SIZE = [0] + instance['s']
+    SIZE = instance['s']
     D = instance['D']
     NODES = ITEMS + 1
 
