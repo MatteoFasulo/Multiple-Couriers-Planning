@@ -290,7 +290,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if args.runall:
-        with ProcessPoolExecutor(max_workers=1) as executor:
+        with ProcessPoolExecutor(max_workers=os.cpu_count()/2) as executor:
             futures = []
             instances = sorted(os.listdir('Instances'), key=lambda x: int(re.search(r'\d+', x).group()))
             instances = [inst for inst in instances if inst.endswith('.dat')]
