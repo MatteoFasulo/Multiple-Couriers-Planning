@@ -27,7 +27,7 @@ python smt.py --i Instances/inst01.dat --model SB --verbose
 ## Run MIP
 
 ```python
-python mip.py --i Instances/inst01.dat
+python mip.py --i Instances/inst01.dat -- solver CBC --model SB --verbose
 ```
 
 ## Check Solution

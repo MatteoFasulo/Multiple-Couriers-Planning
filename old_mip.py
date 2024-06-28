@@ -6,18 +6,18 @@ import os, re, time, argparse
 from utils import read_instance, write_json_solution, path_sequence
 
 def main(args):
-    instance = read_instance(args.instance, depot=0)
+    instance = read_instance(args.instance, depot=0, padded_size=True)
 
     COURIERS = instance['m']
     ITEMS = instance['n']
     MAX_LOAD = instance['l']
-    SIZE = [0] + instance['s']
+    SIZE = instance['s']
     D = instance['D']
     NODES = ITEMS + 1
 
     start = time.time()
     symm = instance['D_symmetric']
-    lower_bnd, _ = instance['lower_bound']
+    lower_bnd = instance['lower_bound']
     upper_bnd = instance['upper_bound']
 
     m = gp.Model()

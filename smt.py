@@ -159,10 +159,10 @@ def main(args):
     #                    s.add(Not(And(TENSOR[0][j][k1], TENSOR[0][i][k2])))
 
     # 7.2) Ordering symmetry breaking: first item delivered by each courier has a lesser value, with the last courier being an exception
-    #for k in range(COURIERS-2):
-    #    for i in range(NODES):
-    #        for j in range(i + 1, NODES):
-    #            s.add(Implies(TENSOR[0][j][k], Not(TENSOR[0][i][k+1])))
+    for k in range(COURIERS-2):
+        for i in range(NODES):
+            for j in range(i + 1, NODES):
+                s.add(Implies(TENSOR[0][j][k], Not(TENSOR[0][i][k+1])))
 
     # 8) Path symmetry breaking for symmetric matrix only
     if symm:
