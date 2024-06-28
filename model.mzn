@@ -29,7 +29,7 @@ array[ITEMS] of var 1..couriers: loads;
 array[COURIERS] of var min(DEMAND)..max_load: couriers_loads;
 
 
-% Each courier starts and ends in depot
+% Depot appears exactly once and must be accessible
 constraint forall(k in COURIERS) (
       count([couriers_nodes[k, i] | i in ITEMS], items+1, 1)  /\ couriers_nodes[k, items+1] != items+1
 );
@@ -47,10 +47,10 @@ constraint forall(k in COURIERS) (
     )
 );
 
-% ensure that each courier does not exceed the max capacity
+% Ensure that each courier does not exceed the max capacity
 constraint bin_packing_capa(CAPACITY, loads, DEMAND);
 
-% Circuit
+% Subcircuit
 constraint forall(k in COURIERS) (
       subcircuit([couriers_nodes[k, i] | i in NODES]) 
 );

@@ -85,7 +85,6 @@ def max_z3(vars):
     max_value = vars[0]
     for arg in vars[1:]:
         max_value = If(arg > max_value, arg, max_value)
-
     return max_value
 
 
@@ -116,12 +115,13 @@ def main(args):
     for i in range(NODES):
         for j in range(NODES):
             for k in range(COURIERS):
-                s.add(Implies(TENSOR[i][j][k], Or([TENSOR[j][h][k] for h in range(NODES)])))
+                if i != j:
+                    s.add(Implies(TENSOR[i][j][k], Or([TENSOR[j][h][k] for h in range(NODES)])))
 
     # 2) Each node is entered and leaved just once by any vehicle
     for j in range(1, NODES):
-        s.add(exactly_one_bw([TENSOR[i][j][k] for i in range(NODES) for k in range(COURIERS)], f'valid_n_{j}'))
-        s.add(exactly_one_bw([TENSOR[j][i][k] for i in range(NODES) for k in range(COURIERS)], f'valid_node_{j}'))
+        s.add(exactly_one_bw([TENSOR[i][j][k] for i in range(NODES) for k in range(COURIERS) if i != j], f'valid_n_{j}'))
+        s.add(exactly_one_bw([TENSOR[j][i][k] for i in range(NODES) for k in range(COURIERS) if i != j], f'valid_node_{j}'))
 
     # 3) Every goes through the depot once
     for k in range(COURIERS):
@@ -134,7 +134,7 @@ def main(args):
 
     # 5) Capacity constraints
     for k in range(COURIERS):
-        s.add(Sum([SIZE[j] * If(TENSOR[i][j][k], 1, 0) for j in range(1, NODES) for i in range(NODES)]) <= MAX_LOAD[k])
+        s.add(Sum([SIZE[j] * If(TENSOR[i][j][k], 1, 0) for j in range(1, NODES) for i in range(NODES) if i != j]) <= MAX_LOAD[k])
 
     # 6) subtour elimination Miller-Tucker-Zemlin formulation
     u = [Int(f'u_{i}') for i in range(NODES)]
@@ -159,10 +159,10 @@ def main(args):
     #                    s.add(Not(And(TENSOR[0][j][k1], TENSOR[0][i][k2])))
 
     # 7.2) Ordering symmetry breaking: first item delivered by each courier has a lesser value, with the last courier being an exception
-    for k in range(COURIERS-2):
-        for i in range(NODES):
-            for j in range(i + 1, NODES):
-                s.add(Implies(TENSOR[0][j][k], Not(TENSOR[0][i][k+1])))
+    #for k in range(COURIERS-2):
+    #    for i in range(NODES):
+    #        for j in range(i + 1, NODES):
+    #            s.add(Implies(TENSOR[0][j][k], Not(TENSOR[0][i][k+1])))
 
     # 8) Path symmetry breaking for symmetric matrix only
     if symm:
@@ -173,7 +173,7 @@ def main(args):
 
     arr_dist = []
     for k in range(COURIERS):
-        arr_dist.append(Sum([If(TENSOR[i][j][k], int(D[i][j]), 0) for i in range(NODES) for j in range(NODES)]))
+        arr_dist.append(Sum([If(TENSOR[i][j][k], int(D[i][j]), 0) for i in range(NODES) for j in range(NODES) if i != j]))
 
     obj = Int('max_distance')
 
@@ -187,6 +187,7 @@ def main(args):
     
     # Check if the problem is satisfiable
     if s.check() != sat:
+        print(s)
         raise Exception('Unsatisfiable problem') # The problem is unsatisfiable
 
     # Initially set the optimality to False
@@ -201,7 +202,7 @@ def main(args):
         # Compute new bounds
         bound_dist = (upper_bnd - lower_bnd) // 2
         # If the bounds are adjacent, set the midpoint to the lower bound
-        if upper_bnd - lower_bnd == 1 or upper_bnd == lower_bnd:
+        if upper_bnd - lower_bnd <= 1:
             midpoint = lower_bnd
             break
         # Otherwise, set the midpoint to the upper bound minus the bound distance and search for the optimal solution
@@ -209,6 +210,7 @@ def main(args):
             midpoint = upper_bnd - bound_dist
 
         # Update the maximum
+        print(f'New midpoint: {midpoint}')
         s.add(obj <= midpoint)
         s.add(obj >= lower_bnd)
 
@@ -234,6 +236,9 @@ def main(args):
             model = s.model()
             upper_bnd = model[obj].as_long()
             previous = False
+            last_satisfiable_model = model  # Save the last satisfiable model
+            optimality = True  # Set optimality to True
+
 
         # If the current time is greater than the effective search time, break the loop (timeout)
         if current_time > effective_search_time:
@@ -243,8 +248,9 @@ def main(args):
     # If the loop exited because a solution was found, set optimality to True
     if s.check() == sat:
         optimality = True
-        model = s.model()
-        time_needed = current_time
+    if not model and last_satisfiable_model:
+        model = last_satisfiable_model
+    time_needed = current_time
 
     all_paths = []
     max_cost = 0
@@ -288,7 +294,7 @@ if __name__ == '__main__':
             futures = []
             instances = sorted(os.listdir('Instances'), key=lambda x: int(re.search(r'\d+', x).group()))
             instances = [inst for inst in instances if inst.endswith('.dat')]
-            for instance in instances[:10]:
+            for instance in instances:
                 instance_args = copy.deepcopy(args)
                 instance_args.instance = f'Instances{os.sep}{instance}'
                 futures.append(executor.submit(main, instance_args))

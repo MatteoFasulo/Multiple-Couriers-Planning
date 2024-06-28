@@ -29,7 +29,7 @@ array[ITEMS] of var 1..couriers: loads;
 array[COURIERS] of var min(DEMAND)..max_load: couriers_loads;
 
 
-% Each courier starts and ends in depot
+% Depot appears exactly once and must be accessible
 constraint forall(k in COURIERS) (
       count([couriers_nodes[k, i] | i in ITEMS], items+1, 1)  /\ couriers_nodes[k, items+1] != items+1
 );
@@ -47,15 +47,15 @@ constraint forall(k in COURIERS) (
     )
 );
 
-% ensure that each courier does not exceed the max capacity
+% Ensure that each courier does not exceed the max capacity
 constraint bin_packing_capa(CAPACITY, loads, DEMAND);
 
-% Circuit
+% Subcircuit
 constraint forall(k in COURIERS) (
       subcircuit([couriers_nodes[k, i] | i in NODES]) 
 );
 
-% distance computation
+% Distance computation
 constraint forall(k in COURIERS) (
       obj_dist[k] = sum([D[i, couriers_nodes[k, i]]| i in NODES where couriers_nodes[k, i] != i])
 );
@@ -68,21 +68,9 @@ constraint forall(k in COURIERS)(
     )
 );
 
-
-% Symmetry breaking: couriers have the same max capacity => tours can be swapped (2)
+% Symmetry breaking: impose ordering on first item delivered by couriers (2)
 constraint forall(k in 1..couriers-2) (
     couriers_nodes[k, items+1] < couriers_nodes[k+1, items+1]
 );
-
-/*
-% Symmetry breaking: (3)
-constraint forall(k1 in COURIERS)(
-    forall (k2 in COURIERS) (
-        if CAPACITY[k1] < CAPACITY[k2] then
-            couriers_loads[k1] <= couriers_loads[k2]
-        endif
-    )  
-);
-*/
 
 constraint obj = max(obj_dist);
