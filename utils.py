@@ -1,4 +1,5 @@
 import json
+import time
 import os
 import re
 import argparse
@@ -16,6 +17,7 @@ def preprocess(D, depot: int = -1):
     """
     Preprocess the distance matrix
     """
+    start = time.time()
     # load it as a numpy array
     D = np.array(D)
     if depot == 0: # take last row and col and put them in the first row and col shifting the rest
@@ -23,7 +25,8 @@ def preprocess(D, depot: int = -1):
         D = np.delete(D, -1, axis=0)
         D = np.insert(D, 0, D[:, -1], axis=1)
         D = np.delete(D, -1, axis=1)
-    return D
+
+    return D, time.time() - start
 
 def compute_lower_bound(D, depot: int = -1):
     """
@@ -40,19 +43,8 @@ def compute_lower_bound(D, depot: int = -1):
     # The lower bound is the maximum of these two values
     lb = max(column[max_idx_row] + np.max(row), row[max_idx_column] + np.max(column))
 
-    # Get the non-zero elements of the row and column
-    nonzero_row = row[np.nonzero(row)]
-    nonzero_column = column[np.nonzero(column)]
-
-    # Calculate the minimum indices for the row and column
-    min_idx_row = np.argmin(nonzero_row)
-    min_idx_column = np.argmin(nonzero_column)
-
-    # The lower bound for courier distances is the minimum of these two values
-    dist_lb = min(column[min_idx_row] + np.min(nonzero_row), row[min_idx_column] + np.min(nonzero_column))
-
-    # Return the lower bounds
-    return lb, dist_lb
+    # Return the lower bound
+    return int(lb)
 
 
 def compute_upper_bound(D, MAX_LOAD):
@@ -70,7 +62,7 @@ def compute_upper_bound(D, MAX_LOAD):
     # Sum the sliced values
     val = np.sum(sliced_arr)
 
-    return val
+    return int(val)
 
 def read_instance(filename: str, depot: int = -1, padded_size: bool = False) -> dict:
     with open(filename, 'r') as file:
@@ -83,7 +75,7 @@ def read_instance(filename: str, depot: int = -1, padded_size: bool = False) -> 
     D = [[int(x) for x in line.split()] for line in data[4:]]
 
     # Preprocess the distance matrix
-    D = preprocess(D, depot=depot)
+    D, preprocess_time = preprocess(D, depot=depot)
 
     if padded_size:
         # Insert 0 demand for the depot
@@ -98,7 +90,7 @@ def read_instance(filename: str, depot: int = -1, padded_size: bool = False) -> 
         'D_symmetric': check_symmetric(D),
         'lower_bound': compute_lower_bound(D, depot=depot),
         'upper_bound': compute_upper_bound(D, max_load),
-        #'old_order': list(idxs)
+        'preprocess_time': preprocess_time,
     }
 
 def path_sequence(path, D=None):
@@ -127,8 +119,7 @@ def convert_dat_to_dzn(filename: str, depot: int):
     with open(filename.replace('.dat', '.dzn'), 'w') as file:
         file.write(f'couriers = {instance["m"]};\n')
         file.write(f'items = {instance["n"]};\n')
-        file.write(f'LOWER_BOUND = {instance["lower_bound"][0]};\n')
-        file.write(f'DIST_LOWER_BOUND = {instance["lower_bound"][1]};\n')
+        file.write(f'LOWER_BOUND = {instance["lower_bound"]};\n')
         file.write(f'UPPER_BOUND = {instance["upper_bound"]};\n')
         file.write(f'CAPACITY = {instance["l"]};\n')
         file.write(f'DEMAND = {instance["s"]};\n')

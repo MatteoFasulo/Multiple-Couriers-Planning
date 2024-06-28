@@ -9,7 +9,7 @@ from utils import read_instance, write_json_solution
 
 def main(args):
     if args.verbose:
-        print(f"Running instance {instance_args.instance} with {args.solver} solver and {args.model} model")
+        print(f"Running instance {args.instance} with {args.solver} solver and {args.model} model")
 
     # Define the solver to use
     solver = Solver.lookup(args.solver)
@@ -109,7 +109,9 @@ def main(args):
     if solver == Solver.lookup("gecode"):
         free_search_strategy = False
 
-    result = instance.solve(timeout=datetime.timedelta(seconds=args.timeout), random_seed=args.seed, free_search=free_search_strategy)
+    effective_search_time = args.timeout - problem['preprocess_time']
+
+    result = instance.solve(timeout=datetime.timedelta(seconds=effective_search_time), random_seed=args.seed, free_search=free_search_strategy)
 
     # Check if a solution has been found
     if result.status is Status.UNKNOWN or result.status is Status.UNSATISFIABLE:
@@ -150,11 +152,12 @@ def main(args):
         res.append(asg)
 
     print(f'Objective value: {obj}')
+    print(f'Preprocess time: {problem['preprocess_time']}')
     print(f'Time needed: {time_needed} seconds')
     print(f'Solution: {res}')
     print(f'Status: {result.status}')
 
-    write_json_solution(args.instance, 'CP', f"{solver.name.lower()} {args.model}", time_needed, optimal_sol, obj, res)
+    write_json_solution(args.instance, 'CP', f"{solver.name.lower()} {args.model}", time_needed+problem['preprocess_time'], optimal_sol, obj, res)
 
     return args.instance, time_needed, obj
 

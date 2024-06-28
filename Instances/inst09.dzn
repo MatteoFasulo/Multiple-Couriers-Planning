@@ -1,7 +1,6 @@
 couriers = 10;
 items = 13;
 LOWER_BOUND = 436;
-DIST_LOWER_BOUND = 30;
 UPPER_BOUND = 1257;
 CAPACITY = [180, 190, 210, 200, 195, 180, 210, 200, 195, 210];
 DEMAND = [4, 12, 3, 15, 13, 20, 21, 4, 25, 21, 7, 3, 9];

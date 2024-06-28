@@ -5,7 +5,6 @@ int: couriers;
 int: items;
 int: UPPER_BOUND;
 int: LOWER_BOUND;
-int: DIST_LOWER_BOUND;
 
 % useful sets
 set of int: COURIERS = 1..couriers;
@@ -17,7 +16,7 @@ array[ITEMS] of int: DEMAND;
 array[NODES, NODES] of int: D; 
 
 % Model variables
-array[COURIERS] of var DIST_LOWER_BOUND..UPPER_BOUND: obj_dist;
+array[COURIERS] of var 0..UPPER_BOUND: obj_dist;
 array[COURIERS, NODES] of var NODES: couriers_nodes;
 
 % objective function
