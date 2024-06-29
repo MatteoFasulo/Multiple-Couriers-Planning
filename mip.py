@@ -37,19 +37,19 @@ def main(args):
     # Constraints
     # 1) Each node is entered just once
     for j in range(1, NODES):
-        cvrp_model += plp.lpSum([TENSOR[i][j][k] for i in range(NODES) for k in range(COURIERS) if i != j]) == 1, f"Node_{j}_once"
+        cvrp_model += plp.lpSum([TENSOR[i][j][k] for i in range(NODES) for k in range(COURIERS)]) == 1, f"Node_{j}_once"
     
     # 2) Every vehicle leaves and goes back to the depot once
     for k in range(COURIERS):
         cvrp_model += plp.lpSum([TENSOR[0][j][k] for j in range(NODES)]) == 1, f"Leaves_depot_{k}_once"
 
         # Capacity constraint for each vehicle
-        cvrp_model += plp.lpSum([SIZE[j] * TENSOR[i][j][k] for j in range(NODES) for i in range(NODES) if i != j]) <= MAX_LOAD[k], f"Capacity_{k}"
+        cvrp_model += plp.lpSum([SIZE[j] * TENSOR[i][j][k] for j in range(NODES) for i in range(NODES)]) <= MAX_LOAD[k], f"Capacity_{k}"
     
     # 3) Vehicle leaves node it enters
     for i in range(NODES):
         for k in range(COURIERS):
-            cvrp_model += plp.lpSum([TENSOR[i][j][k] for j in range(NODES) if i != j]) == plp.lpSum([TENSOR[j][i][k] for j in range(NODES) if i != j]), f"Node_{i}_Courier_{k}_balance"
+            cvrp_model += plp.lpSum([TENSOR[i][j][k] for j in range(NODES)]) == plp.lpSum([TENSOR[j][i][k] for j in range(NODES)]), f"Node_{i}_Courier_{k}_balance"
 
     # 4) Remove self-loops
     for i in range(NODES):
@@ -61,28 +61,25 @@ def main(args):
     for k in range(COURIERS):
         for i in range(1, NODES):
             for j in range(1, NODES):
-                if i != j:
-                    cvrp_model += u[j] - u[i] + Q * (1 - TENSOR[i][j][k]) >= SIZE[j], f"Subtour_{i}_{j}_{k}"
+                cvrp_model += u[j] - u[i] + Q * (1 - TENSOR[i][j][k]) >= SIZE[j], f"Subtour_{i}_{j}_{k}"
 
     if args.model == 'SB':
         # 6) Symmetry breaking constraint: impose order on first node to visit
         for k in range(COURIERS-2):
             for i in range(NODES):
                 for j in range(i + 1, NODES):
-                    if i != j:
-                        cvrp_model += TENSOR[0][j][k] + TENSOR[0][i][k+1] <= 1, f"Symmetry_breaking_{k}_{i}_{j}"
+                    cvrp_model += TENSOR[0][j][k] + TENSOR[0][i][k+1] <= 1, f"Symmetry_breaking_{k}_{i}_{j}"
         
         # 7) Symmetry breaking constraint: remove inverse path solutions
         if symm:
             for k in range(COURIERS):
                 for i in range(NODES):
                     for j in range(i + 1, NODES):
-                        if i != j:
-                            cvrp_model += TENSOR[i][j][k] + TENSOR[j][i][k] <= 1, f"Symmetry_breaking_inverse_{k}_{i}_{j}"
+                        cvrp_model += TENSOR[i][j][k] + TENSOR[j][i][k] <= 1, f"Symmetry_breaking_inverse_{k}_{i}_{j}"
 
     # Objective function: minimize the maximum distance
     for k in range(COURIERS):
-        cvrp_model += plp.lpSum([TENSOR[i][j][k] * D[i][j] for i in range(NODES) for j in range(NODES) if i != j]) <= max_var
+        cvrp_model += plp.lpSum([TENSOR[i][j][k] * D[i][j] for i in range(NODES) for j in range(NODES)]) <= max_var
 
     cvrp_model.setObjective(max_var)
 
@@ -136,7 +133,7 @@ if __name__ == '__main__':
             futures = []
             instances = sorted(os.listdir('Instances'), key=lambda x: int(re.search(r'\d+', x).group()))
             instances = [inst for inst in instances if inst.endswith('.dat')]
-            for instance in instances:
+            for instance in instances[19:]:
                 instance_args = copy.deepcopy(args)
                 instance_args.instance = f'Instances{os.sep}{instance}'
                 futures.append(executor.submit(main, instance_args))
