@@ -1,41 +1,13 @@
 from concurrent.futures import ProcessPoolExecutor
-import os, re, sys, time, argparse
-from itertools import combinations
+import os, re, time, argparse
 from z3 import *
 
-from utils import path_sequence, read_instance, write_json_solution
+from utils import read_instance, write_json_solution, path_sequence
 
 
 # Naive pairwise encoding
 def at_least_one_np(bool_vars):
     return Or(bool_vars)
-
-
-def at_most_one_np(bool_vars):
-    return And([Not(And(pair[0], pair[1])) for pair in combinations(bool_vars, 2)])
-
-
-def exactly_one_np(bool_vars, name = ""):
-    return And(at_least_one_np(bool_vars), at_most_one_np(bool_vars))
-
-# Sequence encoding
-def at_least_one_seq(bool_vars):
-    return at_least_one_np(bool_vars)
-
-def at_most_one_seq(bool_vars, name):
-    constraints = []
-    n = len(bool_vars)
-    s = [Bool(f"s_{name}_{i}") for i in range(n - 1)]
-    constraints.append(Or(Not(bool_vars[0]), s[0]))
-    constraints.append(Or(Not(bool_vars[n-1]), Not(s[n-2])))
-    for i in range(1, n - 1):
-        constraints.append(Or(Not(bool_vars[i]), s[i]))
-        constraints.append(Or(Not(bool_vars[i]), Not(s[i-1])))
-        constraints.append(Or(Not(s[i-1]), s[i]))
-    return And(constraints)
-
-def exactly_one_seq(bool_vars, name):
-    return And(at_least_one_seq(bool_vars), at_most_one_seq(bool_vars, name))
 
 # Binary encoding
 def toBinary(num, length = None):
@@ -65,22 +37,6 @@ def exactly_one_bw(bool_vars, name):
     return And(at_least_one_bw(bool_vars), at_most_one_bw(bool_vars, name)) 
 
 
-# Heule encoding
-def at_least_one_he(bool_vars):
-    return at_least_one_np(bool_vars)
-
-
-def at_most_one_he(bool_vars, name):
-    if len(bool_vars) <= 4:
-        return And([Not(And(pair[0], pair[1])) for pair in combinations(bool_vars, 2)])
-    y = Bool(f"y_{name}")
-    return And(And(at_most_one_np(bool_vars[:3] + [y])), And(at_most_one_he(bool_vars[3:] + [Not(y)], name+"_")))
-
-
-def exactly_one_he(bool_vars, name):
-    return And(at_most_one_he(bool_vars, name), at_least_one_he(bool_vars))
-
-
 def max_z3(vars):
     max_value = vars[0]
     for arg in vars[1:]:
@@ -104,12 +60,9 @@ def main(args):
     lower_bnd = instance['lower_bound']
     upper_bnd = instance['upper_bound']
 
-    # Compute the effective search time
-    effective_search_time = int(args.timeout - instance['preprocess_time'])
-
     # Create the solver
     s = Solver()
-    s.set("timeout", effective_search_time*1000, "seed", args.seed, smtlib2_log="test.smt2")
+    s.set("timeout", args.timeout*1000, "seed", args.seed) # smtlib2_log="test.smt2"
 
     # Decision variables
     TENSOR = [[[Bool(f'x{i}_{j}_{k}') for k in range(COURIERS)] for j in range(NODES)] for i in range(NODES)]
@@ -119,13 +72,12 @@ def main(args):
     for i in range(NODES):
         for j in range(NODES):
             for k in range(COURIERS):
-                if i != j:
-                    s.add(Implies(TENSOR[i][j][k], Or([TENSOR[j][h][k] for h in range(NODES)])))
+                s.add(Implies(TENSOR[i][j][k], Or([TENSOR[j][h][k] for h in range(NODES)])))
 
     # 2) Each node is entered and leaved just once by any vehicle
     for j in range(1, NODES):
-        s.add(exactly_one_bw([TENSOR[i][j][k] for i in range(NODES) for k in range(COURIERS) if i != j], f'valid_n_{j}'))
-        s.add(exactly_one_bw([TENSOR[j][i][k] for i in range(NODES) for k in range(COURIERS) if i != j], f'valid_node_{j}'))
+        s.add(exactly_one_bw([TENSOR[i][j][k] for i in range(NODES) for k in range(COURIERS)], f'valid_n_{j}'))
+        s.add(exactly_one_bw([TENSOR[j][i][k] for i in range(NODES) for k in range(COURIERS)], f'valid_node_{j}'))
 
     # 3) Vehicle leaves node it enters
     for k in range(COURIERS):
@@ -138,7 +90,7 @@ def main(args):
 
     # 5) Capacity constraints
     for k in range(COURIERS):
-        s.add(Sum([SIZE[j] * If(TENSOR[i][j][k], 1, 0) for j in range(1, NODES) for i in range(NODES) if i != j]) <= MAX_LOAD[k])
+        s.add(Sum([SIZE[j] * If(TENSOR[i][j][k], 1, 0) for j in range(1, NODES) for i in range(NODES)]) <= MAX_LOAD[k])
 
     # 6) Subtour elimination Miller-Tucker-Zemlin formulation
     u = [Int(f'u_{i}') for i in range(NODES)]
@@ -157,21 +109,21 @@ def main(args):
     if args.model == 'SB':
         # 7) Ordering symmetry breaking: first item delivered by each courier has a lesser value, with the last courier being an exception
         for k in range(COURIERS-2):
-            for i in range(NODES):
+            for i in range(1, NODES-1):
                 for j in range(i + 1, NODES):
                     s.add(Implies(TENSOR[0][j][k], Not(TENSOR[0][i][k+1])))
 
         # 8) Symmetry breaking constraint: remove inverse path solutions
         if symm:
             for k in range(COURIERS):
-                for i in range(NODES):
+                for i in range(1, NODES-1):
                     for j in range(i + 1, NODES):
                         s.add(Not(And(TENSOR[0][j][k], TENSOR[i][0][k])))
 
     # Array of tour distances
     arr_dist = []
     for k in range(COURIERS):
-        arr_dist.append(Sum([If(TENSOR[i][j][k], int(D[i][j]), 0) for i in range(NODES) for j in range(NODES) if i != j]))
+        arr_dist.append(Sum([If(TENSOR[i][j][k], int(D[i][j]), 0) for i in range(NODES) for j in range(NODES)]))
 
     s.add(obj == max_z3(arr_dist))
     s.add(obj >= lower_bnd)
@@ -195,14 +147,14 @@ def main(args):
     # Set the satisfiable flag to True
     satisfiable = True
     # While the problem is satisfiable keep searching for the optimal solution
-    while satisfiable:
+    while satisfiable and (time.time() - start) < args.timeout:
         # Verbose
         if args.verbose:
             print(f'Upper: {upper_bnd}\tLower: {lower_bnd}\tTime: {int(time.time() - start)}s')
         # Compute new bounds
         bound_dist = (upper_bnd - lower_bnd) // 2
         # If the bounds are adjacent, set the midpoint to the lower bound
-        if upper_bnd - lower_bnd <= 1:
+        if upper_bnd - lower_bnd < 1:
             midpoint = lower_bnd
             break
         # Otherwise, set the midpoint to the upper bound minus the bound distance and search for the optimal solution
@@ -210,7 +162,8 @@ def main(args):
             midpoint = upper_bnd - bound_dist
 
         # Update the maximum
-        print(f'New midpoint: {midpoint}')
+        if args.verbose:
+            print(f'New midpoint: {midpoint}')
         # Add the new constraints
         s.add(obj <= midpoint)
         s.add(obj >= lower_bnd)
@@ -222,9 +175,6 @@ def main(args):
 
         # Check the status of the solver
         status = s.check()
-
-        # Update the wall clock time
-        current_time = int(time.time() - start)
 
         # If the status is unsatisfiable, set the lower bound to the midpoint and pop the solver to the previous state
         if status == unsat:
@@ -240,18 +190,17 @@ def main(args):
             last_satisfiable_model = model  # Save the last satisfiable model
             optimality = True  # Set optimality to True
 
-
-        # If the current time is greater than the effective search time, break the loop (timeout)
-        if current_time > effective_search_time:
-            time_needed = effective_search_time
-            break
-
     # If the loop exited because a solution was found, set optimality to True
+    # TODO: Fix optimality being true even with non-optimal solutions
     if s.check() == sat:
         optimality = True
     if not model and last_satisfiable_model:
         model = last_satisfiable_model
-    time_needed = current_time
+
+    time_needed = time.time() - start
+    if time_needed > args.timeout:
+        optimality = False
+        time_needed = 300
 
     all_paths = []
     max_cost = 0
@@ -267,11 +216,10 @@ def main(args):
             max_cost = cost
 
         path = [x[1] for x in path[:-1]]
-        print(f'Courier: {k}\tPath sequence: {path}\t cost: {cost}\t load: {sum([SIZE[node-1] for node in path])}')
-        print('\n')
+        print(f'Courier: {k}\tPath sequence: {path}\t cost: {cost}')
         all_paths.append(path)
 
-    write_json_solution(args.instance,  'SMT', 'z3', time_needed, optimality, model[obj].as_long(), all_paths)
+    write_json_solution(args.instance,  'SMT', f'z3 {args.model}', time_needed, optimality, model[obj].as_long(), all_paths)
 
     return args.instance, time_needed, model[obj].as_long()
 
