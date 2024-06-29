@@ -4,6 +4,7 @@ import os
 import re
 import argparse
 import numpy as np
+import matplotlib.pyplot as plt
 
 # Read an instance in .dat format and parse the content to a suitable data structure.
 
@@ -113,6 +114,72 @@ def path_sequence(path, D=None):
     for i,j in path:
         cost += D[i][j]
     return cost
+
+def get_solutions(nodes, couriers, distance_matrix, decision_var, verbose: bool = False):
+    all_paths = []
+    for k in range(couriers):
+        path = []
+        for i in range(nodes):
+            for j in range(nodes):
+                if decision_var[i][j][k]:
+                    path.append((i, j))
+        cost = path_sequence(path, distance_matrix)
+        path = [x[1] for x in path[:-1]]
+        if verbose:
+            print(f'Courier: {k}\tPath sequence: {path}\t cost: {cost}')
+        all_paths.append(path)
+    return all_paths
+
+def plot_solution(instance, solution):
+    COURIERS = instance['m']
+    ITEMS = instance['n']
+    MAX_LOAD = instance['l']
+    SIZE = instance['s']
+    D = instance['D']
+    NODES = ITEMS + 1
+
+    num_locs = NODES
+
+    # Define the center of the plot (i.e., the depot)
+    x_coords = [0]
+    y_coords = [0]
+
+    # Define the radius of the circle where the other nodes will be placed
+    radius = 0.5
+
+    # Calculate the angle between each node
+    angle = 2 * np.pi / (num_locs - 1)
+
+    # Generate the coordinates for the other nodes
+    for i in range(1, num_locs):
+        x_coords.append(0 + radius * np.cos(i * angle))
+        y_coords.append(0 + radius * np.sin(i * angle))
+
+    # Plot the depot
+    plt.scatter(x_coords[0], y_coords[0], c='r', s=100, label='Depot')
+
+    for idx, route in enumerate(solution):
+        x = [x_coords[i] for i in route]
+        y = [y_coords[i] for i in route]
+
+        # Plot items
+        plt.scatter(x, y, label=f"Route {idx}", zorder=3, s=75)
+        plt.plot(x, y)
+
+        plt.annotate(
+            "",
+            xy=(x[0], y[0]),
+            xytext=(x_coords[0], y_coords[0]),
+            arrowprops=dict(arrowstyle="-|>"),
+            zorder=1,
+        )
+
+    plt.grid(color="grey", linestyle="solid", linewidth=0.2)
+
+    plt.title("Solution")
+    plt.legend(frameon=False, ncol=2)
+    plt.show()
+
 
 def convert_dat_to_dzn(filename: str, depot: int):
     instance = read_instance(filename, depot=depot)

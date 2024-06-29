@@ -104,12 +104,16 @@ def main(args):
     lower_bnd = instance['lower_bound']
     upper_bnd = instance['upper_bound']
 
+    # Compute the effective search time
     effective_search_time = int(args.timeout - instance['preprocess_time'])
 
+    # Create the solver
     s = Solver()
     s.set("timeout", effective_search_time*1000, "seed", args.seed, smtlib2_log="test.smt2")
 
+    # Decision variables
     TENSOR = [[[Bool(f'x{i}_{j}_{k}') for k in range(COURIERS)] for j in range(NODES)] for i in range(NODES)]
+    obj = Int('max_distance')
 
     # 1) Vehicle leaves node it enters
     for i in range(NODES):
@@ -123,7 +127,7 @@ def main(args):
         s.add(exactly_one_bw([TENSOR[i][j][k] for i in range(NODES) for k in range(COURIERS) if i != j], f'valid_n_{j}'))
         s.add(exactly_one_bw([TENSOR[j][i][k] for i in range(NODES) for k in range(COURIERS) if i != j], f'valid_node_{j}'))
 
-    # 3) Every goes through the depot once
+    # 3) Vehicle leaves node it enters
     for k in range(COURIERS):
         s.add(exactly_one_bw([TENSOR[0][j][k] for j in range(1, NODES)], f'depot_in_{k}'))
 
@@ -136,7 +140,7 @@ def main(args):
     for k in range(COURIERS):
         s.add(Sum([SIZE[j] * If(TENSOR[i][j][k], 1, 0) for j in range(1, NODES) for i in range(NODES) if i != j]) <= MAX_LOAD[k])
 
-    # 6) subtour elimination Miller-Tucker-Zemlin formulation
+    # 6) Subtour elimination Miller-Tucker-Zemlin formulation
     u = [Int(f'u_{i}') for i in range(NODES)]
     Q = max(MAX_LOAD)
 
@@ -150,32 +154,24 @@ def main(args):
                 if i != j:
                     s.add(u[j] - u[i] >= SIZE[j] + If(TENSOR[i][j][k], 0, -Q))
 
-    # 7) size symmetry breaking: TODO: Out of date
-    #for k1 in range(COURIERS):
-    #    for k2 in range(k1 + 1, COURIERS):
-    #        if MAX_LOAD[k1] == MAX_LOAD[k2]:
-    #            for i in range(NODES):
-    #                for j in range(i + 1, NODES):
-    #                    s.add(Not(And(TENSOR[0][j][k1], TENSOR[0][i][k2])))
-
-    # 7.2) Ordering symmetry breaking: first item delivered by each courier has a lesser value, with the last courier being an exception
-    for k in range(COURIERS-2):
-        for i in range(NODES):
-            for j in range(i + 1, NODES):
-                s.add(Implies(TENSOR[0][j][k], Not(TENSOR[0][i][k+1])))
-
-    # 8) Path symmetry breaking for symmetric matrix only
-    if symm:
-        for k in range(COURIERS):
+    if args.model == 'SB':
+        # 7) Ordering symmetry breaking: first item delivered by each courier has a lesser value, with the last courier being an exception
+        for k in range(COURIERS-2):
             for i in range(NODES):
                 for j in range(i + 1, NODES):
-                    s.add(Not(And(TENSOR[0][j][k], TENSOR[i][0][k])))
+                    s.add(Implies(TENSOR[0][j][k], Not(TENSOR[0][i][k+1])))
 
+        # 8) Symmetry breaking constraint: remove inverse path solutions
+        if symm:
+            for k in range(COURIERS):
+                for i in range(NODES):
+                    for j in range(i + 1, NODES):
+                        s.add(Not(And(TENSOR[0][j][k], TENSOR[i][0][k])))
+
+    # Array of tour distances
     arr_dist = []
     for k in range(COURIERS):
         arr_dist.append(Sum([If(TENSOR[i][j][k], int(D[i][j]), 0) for i in range(NODES) for j in range(NODES) if i != j]))
-
-    obj = Int('max_distance')
 
     s.add(obj == max_z3(arr_dist))
     s.add(obj >= lower_bnd)
@@ -190,6 +186,9 @@ def main(args):
         print(s)
         raise Exception('Unsatisfiable problem') # The problem is unsatisfiable
 
+    # Binary search for the optimal solution. The search is performed by decreasing the upper bound and increasing the lower bound
+    # If the problem is SAT, the upper bound is decreased, otherwise the lower bound is increased until the bounds are adjacent
+
     # Initially set the optimality to False
     optimality = False
     previous = True
@@ -198,7 +197,8 @@ def main(args):
     # While the problem is satisfiable keep searching for the optimal solution
     while satisfiable:
         # Verbose
-        print(f'Upper: {upper_bnd}\tLower: {lower_bnd}\tTime: {int(time.time() - start)}s')
+        if args.verbose:
+            print(f'Upper: {upper_bnd}\tLower: {lower_bnd}\tTime: {int(time.time() - start)}s')
         # Compute new bounds
         bound_dist = (upper_bnd - lower_bnd) // 2
         # If the bounds are adjacent, set the midpoint to the lower bound
@@ -211,12 +211,13 @@ def main(args):
 
         # Update the maximum
         print(f'New midpoint: {midpoint}')
+        # Add the new constraints
         s.add(obj <= midpoint)
         s.add(obj >= lower_bnd)
 
         # If the previous solution was found, push the solver
         if previous:
-            s.push()
+            s.push() # Create a backtracking point
             previous = False
 
         # Check the status of the solver
@@ -229,7 +230,7 @@ def main(args):
         if status == unsat:
             lower_bnd = midpoint
             previous = True
-            s.pop()
+            s.pop() # jump back to the last backtrack point
 
         # If the status is satisfiable, set the upper bound to the objective value
         elif status == sat:
@@ -290,7 +291,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if args.runall:
-        with ProcessPoolExecutor(max_workers=os.cpu_count()/2) as executor:
+        with ProcessPoolExecutor(max_workers=os.cpu_count()//2) as executor:
             futures = []
             instances = sorted(os.listdir('Instances'), key=lambda x: int(re.search(r'\d+', x).group()))
             instances = [inst for inst in instances if inst.endswith('.dat')]
