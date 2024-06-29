@@ -79,7 +79,7 @@ def main(args):
         s.add(exactly_one_bw([TENSOR[i][j][k] for i in range(NODES) for k in range(COURIERS)], f'valid_n_{j}'))
         s.add(exactly_one_bw([TENSOR[j][i][k] for i in range(NODES) for k in range(COURIERS)], f'valid_node_{j}'))
 
-    # 3) Vehicle leaves node it enters
+    # 3) Every courier goes through the depot once
     for k in range(COURIERS):
         s.add(exactly_one_bw([TENSOR[0][j][k] for j in range(1, NODES)], f'depot_in_{k}'))
 
