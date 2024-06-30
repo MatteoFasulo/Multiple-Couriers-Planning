@@ -1,19 +1,5 @@
 {
-   "CBC SB": {
-      "time": 0,
-      "optimal": true,
-      "obj": 206,
-      "sol": [
-         [
-            2
-         ],
-         [
-            1,
-            3
-         ]
-      ]
-   },
-   "CBC default": {
+   "GLPK SB": {
       "time": 0,
       "optimal": true,
       "obj": 206,

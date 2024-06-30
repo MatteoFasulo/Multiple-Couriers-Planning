@@ -11,7 +11,7 @@ from utils import read_instance, write_json_solution, get_solutions, plot_soluti
 def main(args):
     if args.verbose:
         print(f"Running instance {args.instance}")
-    instance = read_instance(args.instance, depot=0, padded_size=True)
+    instance = read_instance(args.instance, depot=0, padded_size=False)
 
     COURIERS = instance['m']
     ITEMS = instance['n']
@@ -20,6 +20,9 @@ def main(args):
     D = instance['D']
     NODES = ITEMS + 1
 
+    CUSTOMERS = list(range(1, ITEMS + 1))
+    V = [0] + CUSTOMERS
+
     symm = instance['D_symmetric']
     lower_bnd = instance['lower_bound']
     upper_bnd = instance['upper_bound']
@@ -27,92 +30,93 @@ def main(args):
     effective_search_time = int(args.timeout - instance['preprocess_time'])
 
     # Decision variables
-    TENSOR = plp.LpVariable.dicts("x", (range(NODES), range(NODES), range(COURIERS)), cat=plp.LpBinary)
+    TENSOR = plp.LpVariable.dicts("x", (V, V, range(COURIERS)), cat=plp.LpBinary)
+    y = plp.LpVariable.dicts("y", (V, range(COURIERS)), cat=plp.LpBinary)
+    u = plp.LpVariable.dicts("u", (CUSTOMERS, range(COURIERS)), lowBound=0, upBound=max(MAX_LOAD), cat=plp.LpInteger)
     max_var = plp.LpVariable("max_var", lowBound=lower_bnd, upBound=upper_bnd, cat=plp.LpInteger)
-
+    
     # Model
     cvrp_model = plp.LpProblem("CVRP", plp.LpMinimize) 
 
-    cvrp_model += max_var, "Objective"
+    cvrp_model += max_var
+    cvrp_model.setObjective(max_var)
 
     # Constraints
-    # 1) Each node is entered just once
-    for j in range(1, NODES):
-        cvrp_model += plp.LpConstraint(plp.lpSum([TENSOR[i][j][k] for i in range(NODES) for k in range(COURIERS)]), sense=plp.LpConstraintEQ, rhs=1, name=f"Node_{j}_once")
-    
-    # 2) Every vehicle leaves the depot once
-    for k in range(COURIERS):
-        cvrp_model += plp.LpConstraint(plp.lpSum([TENSOR[0][j][k] for j in range(NODES)]), sense=plp.LpConstraintEQ, rhs=1, name=f"Leaves_depot_{k}_once")
-    
-    # 3) Vehicle leaves node it enters
-    for i in range(NODES):
-        for k in range(COURIERS):
-            cvrp_model += plp.LpConstraint(plp.lpSum([TENSOR[i][j][k] for j in range(NODES)]) - plp.lpSum([TENSOR[j][i][k] for j in range(NODES)]), sense=plp.LpConstraintEQ, rhs=0, name=f"Node_{i}_Courier_{k}_balance")
-
-    # 4) Remove self-loops
-    for i in range(NODES):
-        for k in range(COURIERS):
-            cvrp_model += TENSOR[i][i][k] == 0, f"Self_loop_{i}_{k}"
-
-    # 5) Capacity constraints
-    for k in range(COURIERS):
-        cvrp_model += plp.LpConstraint(plp.lpSum([SIZE[j] * TENSOR[i][j][k] for j in range(1, NODES) for i in range(NODES)]), sense=plp.LpConstraintLE, rhs=MAX_LOAD[k], name=f"Capacity_{k}")
-
-    # 6) Subtour elimination Miller-Tucker-Zemlin formulation
-    Q = max(MAX_LOAD)
-    u = [plp.LpVariable(f"u_{i}", lowBound=SIZE[i], upBound=max(MAX_LOAD), cat=plp.LpInteger) for i in range(NODES)]
-    
-    for k in range(COURIERS):
-        for i in range(1, NODES):
-            for j in range(1, NODES):
-                cvrp_model += u[i] + SIZE[j] * TENSOR[i][j][k] - Q * (1 - TENSOR[i][j][k]) <= u[j], f"Subtour_{k}_{i}_{j}"
-
-    if args.model == 'SB':
-        for k in range(COURIERS-2):
-            cvrp_model += plp.lpSum([i * TENSOR[0][j][k] for i in range(1, NODES-1) for j in range(i + 1, NODES)]) <= plp.lpSum([i * TENSOR[0][j][k+1] for i in range(1, NODES-1) for j in range(i + 1, NODES)]), f"Order_{k}"
-        
-        # 8) Symmetry breaking constraint: remove inverse path solutions
-        if symm:
-            for k in range(COURIERS):
-                for i in range(NODES):
-                    for j in range(i + 1, NODES):
-                        cvrp_model += plp.LpConstraint(TENSOR[i][j][k] + TENSOR[j][i][k], sense=plp.LpConstraintLE, rhs=1, name=f"Symmetry_breaking_inverse_{k}_{i}_{j}")
-
-    # Objective function: minimize the maximum distance
     for k in range(COURIERS):
         cvrp_model += plp.lpSum([TENSOR[i][j][k] * D[i][j] for i in range(NODES) for j in range(NODES)]) <= max_var, f"Objective_{k}"
 
+    for i in CUSTOMERS:
+        cvrp_model += plp.lpSum([y[i][k] for k in range(COURIERS)]) == 1, f"Visit_{i}"
+        cvrp_model += plp.lpSum([TENSOR[i][j][k] for j in V for k in range(COURIERS)]) == 1, f"Visit_{i}_{k}"
+
+    for j in CUSTOMERS:
+        cvrp_model += plp.lpSum([TENSOR[i][j][k] for i in V for k in range(COURIERS)]) == 1
+
+    cvrp_model += plp.lpSum([y[0][k] for k in range(COURIERS)]) == COURIERS, f"Visit_{0}"
+
+    for k in range(COURIERS):
+        cvrp_model += plp.lpSum([y[i][k] * SIZE[i-1] for i in CUSTOMERS]) <= MAX_LOAD[k], f"Capacity_{k}"
+        cvrp_model += plp.lpSum([TENSOR[i][i][k] for i in V]) == 0, f"Diagonal_{k}"
+        cvrp_model += plp.lpSum([TENSOR[i][0][k] for i in V]) == 1
+    
+    for i in CUSTOMERS:
+        for k in range(COURIERS):
+            cvrp_model += plp.lpSum([TENSOR[i][j][k] for j in V]) == plp.lpSum([TENSOR[j][i][k] for j in V]), f"Flow_{i}_{k}"
+            cvrp_model += plp.lpSum([TENSOR[j][i][k] for j in V]) == y[i][k]
+    
+    for k in range(COURIERS):
+        for j in V:
+            cvrp_model += plp.lpSum(TENSOR[i][j][k] for i in V)==plp.lpSum(TENSOR[i][j][k] for i in V)
+    
+    for k in range(COURIERS):
+        for i in CUSTOMERS:
+            for j in CUSTOMERS:
+                if i != j:
+                    cvrp_model += (u[i][k] - u[j][k] + ITEMS * TENSOR[i][j][k] <= ITEMS - 1)
+
+    for i in CUSTOMERS:
+        for j in CUSTOMERS:
+            if i != j:
+                cvrp_model += (u[i][k] - u[j][k] + ITEMS * TENSOR[i][j][k] <= ITEMS - 1)
+
+    # Symmetry breaking, enforce increasing order in first item of the path
+    if args.model == 'SB':
+        for k in range(COURIERS-2):
+            cvrp_model += plp.lpSum([i * TENSOR[0][j][k] for i in range(1, NODES-1) for j in range(i + 1, NODES)]) <= plp.lpSum([i * TENSOR[0][j][k+1] for i in range(1, NODES-1) for j in range(i + 1, NODES)]), f"Order_{k}"
+
+
     # Solve the model3
     if args.solver == 'CBC':
-        solver = plp.PULP_CBC_CMD(msg=args.verbose, timeLimit=effective_search_time, timeMode='cpu', options=[f"RandomS {args.seed}"])
+        solver = plp.PULP_CBC_CMD(msg=args.verbose, timeLimit=effective_search_time, timeMode='cpu')
     elif args.solver == 'GLPK':
-        solver = plp.GLPK_CMD(msg=args.verbose, timeLimit=effective_search_time)
+        solver = plp.GLPK_CMD(msg=args.verbose, timeLimit=effective_search_time, timeMode='cpu')
+    elif args.solver == 'COIN-OR':
+        solver = plp.COIN_CMD(msg=args.verbose, timeLimit=effective_search_time, timeMode='cpu')
 
     # Solve the model
     cvrp_model.solve(solver)
 
     time_needed = cvrp_model.solutionTime.__floor__()
     status = cvrp_model.status
-    if status == plp.LpStatusNotSolved or status == plp.LpStatusUndefined or status == plp.LpStatusInfeasible:
+    if status == plp.LpStatusNotSolved or status == plp.LpStatusUndefined:
         return args.instance, None, None, None
     obj_val = int(plp.value(cvrp_model.objective))
     optimality = status == plp.LpStatusOptimal
     if time_needed >= effective_search_time:
         optimality = False
-
     # Print the results
     if args.verbose:
         print(f"Status: {plp.LpStatus[status]}")
         print(f"Objective: {obj_val}")
         print(f"Time needed: {time_needed}")
-
+        
     all_paths = get_solutions(NODES, COURIERS, D, TENSOR, args.verbose)
 
     #plot_solution(instance, all_paths)
 
     write_json_solution(args.instance, 'MIP', f'{args.solver} {args.model}', time_needed, optimality, obj_val, all_paths)
 
-    return args.instance, obj_val, time_needed, obj_val
+    return args.instance, time_needed, obj_val
 
 
 if __name__ == '__main__':
@@ -124,14 +128,14 @@ if __name__ == '__main__':
     parser.add_argument('--instance', type=str, metavar='--i', help='Input instance', required=False)
     parser.add_argument('--runall', help='Run all instances', default=False, required=False, action='store_true')
     parser.add_argument('--timeout', type=int, metavar='--t', help='Timeout for the solver', default=300, required=False)
-    parser.add_argument('--solver', type=str, metavar='--s', help='Solver to use', choices=['CBC', 'GLPK'], default='CBC')
+    parser.add_argument('--solver', type=str, metavar='--s', help='Solver to use', choices=['CBC', 'GLPK', 'COIN-OR'], default='CBC')
     parser.add_argument('--seed', type=int, help='Set seed for solving', default=42, required=False)
     parser.add_argument('--model', type=str, metavar='--m', help='Model to use', choices=['default', 'SB'], default='default')
     parser.add_argument('--verbose', help='Verbose mode', default=False, required=False, action='store_true')
     args = parser.parse_args()
 
     if args.runall:
-        with ProcessPoolExecutor(max_workers=1) as executor:
+        with ProcessPoolExecutor(max_workers=os.cpu_count()//2) as executor:
             futures = []
             instances = sorted(os.listdir('Instances'), key=lambda x: int(re.search(r'\d+', x).group()))
             instances = [inst for inst in instances if inst.endswith('.dat')]

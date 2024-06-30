@@ -36,12 +36,15 @@ def at_most_one_bw(bool_vars, name):
 def exactly_one_bw(bool_vars, name):
     return And(at_least_one_bw(bool_vars), at_most_one_bw(bool_vars, name)) 
 
-
+# Maximum function
 def max_z3(vars):
     max_value = vars[0]
     for arg in vars[1:]:
         max_value = If(arg > max_value, arg, max_value)
     return max_value
+
+def int_to_bool(n, bits):
+    return [Bool(f'b_{i}') for i in range(bits)]
 
 
 def main(args):
@@ -129,6 +132,10 @@ def main(args):
     s.add(obj >= lower_bnd)
     s.add(obj <= upper_bnd)
 
+        
+    with open('test.cnf', 'w') as f:
+        f.write(s.dimacs())
+
     # Start the timer
     start = time.time()
     
@@ -151,9 +158,10 @@ def main(args):
         if args.verbose:
             print(f'Upper: {upper_bnd}\tLower: {lower_bnd}\tTime: {int(time.time() - start)}s')
         # Compute new bounds
-        bound_dist = (upper_bnd - lower_bnd) / 2
+        bound_dist = (upper_bnd - lower_bnd) // 2
         # If the bounds are adjacent, set the midpoint to the lower bound
         if upper_bnd - lower_bnd < 1:
+            midpoint = lower_bnd
             break
         # Otherwise, set the midpoint to the upper bound minus the bound distance and search for the optimal solution
         else:
@@ -163,8 +171,8 @@ def main(args):
         if args.verbose:
             print(f'New midpoint: {midpoint}')
         # Add the new constraints
-        s.add(obj <= midpoint)
-        s.add(obj >= lower_bnd)
+        s.add(obj <= BitVecVal(midpoint, BIN_WIDTH))
+        s.add(obj >= BitVecVal(lower_bnd, BIN_WIDTH))
 
         # If the previous solution was found, push the solver
         if previous:
