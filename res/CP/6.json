@@ -1,5 +1,5 @@
 {
-   "chuffed default": {
+   "gecode SB": {
       "time": 0,
       "optimal": true,
       "obj": 322,
@@ -27,7 +27,7 @@
       ]
    },
    "gecode default": {
-      "time": 1,
+      "time": 0,
       "optimal": true,
       "obj": 322,
       "sol": [
@@ -53,8 +53,8 @@
          ]
       ]
    },
-   "gecode SB": {
-      "time": 0.0,
+   "chuffed default": {
+      "time": 0,
       "optimal": true,
       "obj": 322,
       "sol": [
@@ -90,11 +90,11 @@
             8
          ],
          [
-            3,
+            2,
             7
          ],
          [
-            2
+            3
          ],
          [
             4

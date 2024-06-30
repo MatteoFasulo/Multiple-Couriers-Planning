@@ -70,7 +70,9 @@ constraint forall(k in COURIERS)(
 
 % Symmetry breaking: impose ordering on first item delivered by couriers (2)
 constraint forall(k in 1..couriers-2) (
-    couriers_nodes[k, items+1] < couriers_nodes[k+1, items+1]
+    if CAPACITY[k] = CAPACITY[k+1] then
+        couriers_nodes[k, items+1] < couriers_nodes[k+1, items+1]
+    endif
 );
 
 constraint obj = max(obj_dist);

@@ -31,23 +31,7 @@ def main(args):
     elif args.model == 'SB':
         model = Model('model_SB.mzn')
 
-        # Add symmetry breaking constraint if the distance matrix is symmetric (1)
-        #if problem["D_symmetric"]:
-        #    model.add_string(
-        #        r"""
-        #        % Symmetry breaking for symmetric matrices
-        #        % Order of traversing the tour
-        #        constraint forall(k in COURIERS) (
-        #            forall(i in ITEMS) (
-        #                if couriers_nodes[k, i] = items+1 then
-        #                    i <= couriers_nodes[k, items+1]
-        #                endif
-        #            )
-        #        );
-        #        """
-        #    )
-
-    if solver == Solver.lookup("gecode") or solver == Solver.lookup("com.google.ortools.sat"):
+    if solver == Solver.lookup("gecode"):
         if problem["D_symmetric"]:
             model.add_string(
                 r"""
@@ -109,9 +93,7 @@ def main(args):
     if solver == Solver.lookup("gecode"):
         free_search_strategy = False
 
-    effective_search_time = args.timeout - problem['preprocess_time']
-
-    result = instance.solve(timeout=datetime.timedelta(seconds=effective_search_time), random_seed=args.seed, free_search=free_search_strategy)
+    result = instance.solve(timeout=datetime.timedelta(seconds=args.timeout), random_seed=args.seed, free_search=free_search_strategy)
 
     # Check if a solution has been found
     if result.status is Status.UNKNOWN or result.status is Status.UNSATISFIABLE:
@@ -137,8 +119,6 @@ def main(args):
 
     obj = max(result.solution.obj_dist)
     ITEMS = len(couriers_nodes[0])
-    
-    print(np.array(couriers_nodes).reshape(len(couriers_nodes), ITEMS))
 
     res = []
     for k in range(len(couriers_nodes)):
@@ -151,13 +131,13 @@ def main(args):
             second = couriers_nodes[k][start]
         res.append(asg)
 
-    print(f'Objective value: {obj}')
-    print(f'Preprocess time: {problem['preprocess_time']}')
-    print(f'Time needed: {time_needed} seconds')
-    print(f'Solution: {res}')
-    print(f'Status: {result.status}')
+    if args.verbose:
+        print(f'Objective value: {obj}')
+        print(f'Time needed: {time_needed} seconds')
+        print(f'Solution: {res}')
+        print(f'Status: {result.status}')
 
-    write_json_solution(args.instance, 'CP', f"{solver.name.lower()} {args.model}", time_needed+problem['preprocess_time'], optimal_sol, obj, res)
+    write_json_solution(args.instance, 'CP', f"{solver.name.lower()} {args.model}", time_needed, optimal_sol, obj, res)
 
     return args.instance, time_needed, obj
 
@@ -171,7 +151,7 @@ if __name__ == '__main__':
     parser.add_argument('--instance', type=str, metavar='--i', help='Input instance', required=False)
     parser.add_argument('--runall', help='Run all instances', default=False, required=False, action='store_true')
     parser.add_argument('--timeout', type=int, metavar='--t', help='Timeout for the solver', default=300, required=False)
-    parser.add_argument('--solver', type=str, metavar='--s', help='Solver to use', choices=['gecode', 'chuffed', 'com.google.ortools.sat'])
+    parser.add_argument('--solver', type=str, metavar='--s', help='Solver to use', choices=['gecode', 'chuffed'])
     parser.add_argument('--seed', type=int, help='Set seed for solving', default=42, required=False)
     parser.add_argument('--model', type=str, metavar='--m', help='Model to use', choices=['default', 'SB'], default='default')
     parser.add_argument('--verbose', help='Verbose mode', default=False, required=False, action='store_true')

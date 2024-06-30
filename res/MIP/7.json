@@ -1,6 +1,6 @@
 {
    "GLPK SB": {
-      "time": 50,
+      "time": 28,
       "optimal": true,
       "obj": 167,
       "sol": [

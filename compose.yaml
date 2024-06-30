@@ -3,9 +3,9 @@ services:
   cdmo:
     build:
       context: .
-    command: python ......
+      dockerfile: Dockerfile  # Make sure your Dockerfile is named 'Dockerfile' and located in the same directory
+    image: MatteoFasulo/multiple-couriers-planning
     volumes:
-      - .:/app
-    container_name: cmdo_project
+      - ./res:/src/res
+    container_name: cvrp_project
     network_mode: "host"
-    image: multiple-couriers-planning-cdmo:latest

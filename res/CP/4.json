@@ -1,6 +1,6 @@
 {
-   "gecode default": {
-      "time": 1,
+   "gecode SB": {
+      "time": 0,
       "optimal": true,
       "obj": 220,
       "sol": [
@@ -32,8 +32,8 @@
          ]
       ]
    },
-   "gecode SB": {
-      "time": 0.0,
+   "gecode default": {
+      "time": 0,
       "optimal": true,
       "obj": 220,
       "sol": [

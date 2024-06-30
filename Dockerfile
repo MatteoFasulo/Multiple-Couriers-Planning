@@ -1,22 +1,20 @@
-ARG PYTHON_VERSION=3.11
-FROM python:${PYTHON_VERSION}-slim as base
+FROM minizinc/minizinc:latest
 
-ENV PYTHONUNBUFFERED=1
-ENV PIP_DISABLE_PIP_VERSION_CHECK=1
-ENV PYTHONDONTWRITEBYTECODE=1
-
-ARG UID=10001
-RUN adduser \
-    --disabled-password \
-    --gecos "" \
-    --home "/nonexistent" \
-    --shell "/sbin/nologin" \
-    --no-create-home \
-    --uid "${UID}" \
-    appuser
+# Install linux packages
+RUN apt-get update && apt-get install -y \
+    apt-transport-https \
+    python3 \
+    python3-pip \
+    build-essential \
+    libpq-dev \
+    glpk-utils \
+    && rm -rf /var/lib/apt/lists/*
     
-WORKDIR /app
-COPY ./requirements.txt .
-RUN pip install -r requirements.txt
+WORKDIR /src
 
 COPY . .
+
+RUN pip install -r requirements.txt --break-system-packages
+
+# What to run when the container starts
+CMD ["./run_all.sh", "--verbose"]
