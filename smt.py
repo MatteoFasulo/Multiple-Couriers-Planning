@@ -62,7 +62,7 @@ def main(args):
 
     # Create the solver
     s = Solver()
-    s.set("timeout", args.timeout*1000, "seed", args.seed) # smtlib2_log="test.smt2"
+    s.set("timeout", args.timeout*1000, "seed", args.seed, smtlib2_log="test.smt2") # 
 
     # Decision variables
     TENSOR = [[[Bool(f'x{i}_{j}_{k}') for k in range(COURIERS)] for j in range(NODES)] for i in range(NODES)]
@@ -90,7 +90,7 @@ def main(args):
 
     # 5) Capacity constraints
     for k in range(COURIERS):
-        s.add(Sum([SIZE[j] * If(TENSOR[i][j][k], 1, 0) for j in range(1, NODES) for i in range(NODES)]) <= MAX_LOAD[k])
+        s.add(Sum([If(TENSOR[i][j][k], SIZE[j], 0) for j in range(1, NODES) for i in range(NODES)]) <= MAX_LOAD[k])
 
     # 6) Subtour elimination Miller-Tucker-Zemlin formulation
     u = [Int(f'u_{i}') for i in range(NODES)]
