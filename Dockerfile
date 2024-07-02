@@ -14,7 +14,7 @@ WORKDIR /src
 
 COPY . .
 
-RUN pip install -r requirements.txt --break-system-packages
+RUN python3 -m pip install -r requirements.txt --break-system-packages
 
 # What to run when the container starts
 CMD ["./run_all.sh", "--verbose"]

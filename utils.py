@@ -115,8 +115,9 @@ def path_sequence(path, D=None):
         cost += D[i][j]
     return cost
 
-def get_solutions(nodes, couriers, distance_matrix, decision_var, verbose: bool = False):
+def get_solutions(nodes, couriers, distance_matrix, decision_var, obj_val, verbose: bool = False):
     all_paths = []
+    all_costs = []
     for k in range(couriers):
         path = []
         for i in range(nodes):
@@ -124,10 +125,14 @@ def get_solutions(nodes, couriers, distance_matrix, decision_var, verbose: bool 
                 if decision_var[i][j][k]:
                     path.append((i, j))
         cost = path_sequence(path, distance_matrix)
+        all_costs.append(cost)
         path = [x[1] for x in path[:-1]]
         if verbose:
             print(f'Courier: {k}\tPath sequence: {path}\t cost: {cost}')
         all_paths.append(path)
+    # Check that the maximum among the costs is the same as the objective value
+    if max(all_costs) != obj_val:
+        return None
     return all_paths
 
 def plot_solution(instance, solution):

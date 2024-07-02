@@ -62,7 +62,7 @@ def main(args):
 
     # Create the solver
     s = Solver()
-    s.set("timeout", args.timeout*1000, "seed", args.seed, smtlib2_log="test.smt2") # 
+    s.set("timeout", args.timeout*1000, "seed", args.seed) # smtlib2_log="test.smt2"
 
     # Decision variables
     TENSOR = [[[Bool(f'x_{i}_{j}_{k}') for k in range(COURIERS)] for j in range(NODES)] for i in range(NODES)]
@@ -134,9 +134,9 @@ def main(args):
     
     # Check if the problem is satisfiable
     if s.check() != sat:
-        print(s)
         raise Exception('Unsatisfiable problem') # The problem is unsatisfiable
 
+    print('Dopo il check')
     # Binary search for the optimal solution. The search is performed by decreasing the upper bound and increasing the lower bound
     # If the problem is SAT, the upper bound is decreased, otherwise the lower bound is increased until the bounds are adjacent
 
@@ -147,6 +147,7 @@ def main(args):
     satisfiable = True
     # While the problem is satisfiable keep searching for the optimal solution
     while satisfiable and (time.time() - start) < args.timeout:
+        print('Time:', time.time() - start)
         # Verbose
         if args.verbose:
             print(f'Upper: {upper_bnd}\tLower: {lower_bnd}\tTime: {int(time.time() - start)}s')
@@ -189,13 +190,12 @@ def main(args):
             optimality = True  # Set optimality to True
 
     # If the loop exited because a solution was found, set optimality to True
-    # TODO: Fix optimality being true even with non-optimal solutions
     if s.check() == sat:
         optimality = True
     if not model and last_satisfiable_model:
         model = last_satisfiable_model
 
-    time_needed = time.time() - start
+    time_needed = (time.time() - start).__floor__()
     if time_needed > args.timeout:
         optimality = False
         time_needed = 300
@@ -242,14 +242,16 @@ if __name__ == '__main__':
             futures = []
             instances = sorted(os.listdir('Instances'), key=lambda x: int(re.search(r'\d+', x).group()))
             instances = [inst for inst in instances if inst.endswith('.dat')]
-            for instance in instances:
+            # Run only the first 10 instances as the others are not even compiling due to the model size and constraints
+            for instance in instances[:10]: 
                 instance_args = copy.deepcopy(args)
                 instance_args.instance = f'Instances{os.sep}{instance}'
                 futures.append(executor.submit(main, instance_args))
             # Collect the results
             results = [future.result() for future in futures]
 
-            print(results)
+            if args.verbose:
+                print(results)
 
     elif args.instance:
         main(args)

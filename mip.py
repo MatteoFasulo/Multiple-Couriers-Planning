@@ -106,9 +106,9 @@ def main(args):
         print(f"Objective: {obj_val}")
         print(f"Time needed: {time_needed}")
 
-    all_paths = get_solutions(NODES, COURIERS, D, TENSOR, args.verbose)
-
-    #plot_solution(instance, all_paths)
+    all_paths = get_solutions(NODES, COURIERS, D, TENSOR, obj_val, args.verbose)
+    if all_paths is None:
+        return args.instance, None, None, None
 
     write_json_solution(args.instance, 'MIP', f'{args.solver} {args.model}', time_needed, optimality, obj_val, all_paths)
 
