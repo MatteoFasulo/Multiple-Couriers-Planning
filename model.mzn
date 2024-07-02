@@ -24,7 +24,7 @@ var LOWER_BOUND..UPPER_BOUND: obj;
 
 int: max_load = max(CAPACITY) + 1;
 
-array[ITEMS] of var 1..couriers: loads;
+array[ITEMS] of var COURIERS: loads;
 
 array[COURIERS] of var min(DEMAND)..max_load: couriers_loads;
 

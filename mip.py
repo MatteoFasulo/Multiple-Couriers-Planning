@@ -24,8 +24,6 @@ def main(args):
     lower_bnd = instance['lower_bound']
     upper_bnd = instance['upper_bound']
 
-    effective_search_time = int(args.timeout - instance['preprocess_time'])
-
     # Decision variables
     TENSOR = plp.LpVariable.dicts("x", (range(NODES), range(NODES), range(COURIERS)), cat=plp.LpBinary)
     max_var = plp.LpVariable("max_var", lowBound=lower_bnd, upBound=upper_bnd, cat=plp.LpInteger)
@@ -84,9 +82,9 @@ def main(args):
 
     # Solve the model3
     if args.solver == 'CBC':
-        solver = plp.PULP_CBC_CMD(msg=args.verbose, timeLimit=effective_search_time, timeMode='cpu', options=[f"RandomS {args.seed}"])
+        solver = plp.PULP_CBC_CMD(msg=args.verbose, timeLimit=args.timeout, timeMode='cpu', options=[f"RandomS {args.seed}"])
     elif args.solver == 'GLPK':
-        solver = plp.GLPK_CMD(msg=args.verbose, timeLimit=effective_search_time)
+        solver = plp.GLPK_CMD(msg=args.verbose, timeLimit=args.timeout)
 
     # Solve the model
     cvrp_model.solve(solver)
@@ -97,8 +95,9 @@ def main(args):
         return args.instance, None, None, None
     obj_val = int(plp.value(cvrp_model.objective))
     optimality = status == plp.LpStatusOptimal
-    if time_needed >= effective_search_time:
+    if time_needed >= args.timeout:
         optimality = False
+        time_needed = 300
 
     # Print the results
     if args.verbose:

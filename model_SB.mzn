@@ -24,7 +24,7 @@ var LOWER_BOUND..UPPER_BOUND: obj;
 
 int: max_load = max(CAPACITY) + 1;
 
-array[ITEMS] of var 1..couriers: loads;
+array[ITEMS] of var COURIERS: loads;
 
 array[COURIERS] of var min(DEMAND)..max_load: couriers_loads;
 
@@ -60,7 +60,6 @@ constraint forall(k in COURIERS) (
       obj_dist[k] = sum([D[i, couriers_nodes[k, i]]| i in NODES where couriers_nodes[k, i] != i])
 );
 
-
 % Make sure that the couriers_loads array contains the sum of the loads of the items assigned to each courier
 constraint forall(k in COURIERS)(
     couriers_loads[k] = sum(
@@ -68,11 +67,13 @@ constraint forall(k in COURIERS)(
     )
 );
 
-% Symmetry breaking: impose ordering on first item delivered by couriers (2)
-constraint forall(k in 1..couriers-2) (
-    if CAPACITY[k] = CAPACITY[k+1] then
-        couriers_nodes[k, items+1] < couriers_nodes[k+1, items+1]
-    endif
+% Symmetry breaking: if item i is served by courier k then at least one other item with a smaller index is served by courier k - 1 (HC1)
+constraint forall(k in 2..couriers) (
+    forall(i in 2..items) (
+        if loads[i] = k then
+            count([loads[j] | j in 1..i-1], k-1) >= 1
+        endif
+    )
 );
 
 constraint obj = max(obj_dist);

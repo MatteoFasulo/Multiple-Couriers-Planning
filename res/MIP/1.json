@@ -1,6 +1,6 @@
 {
    "CBC default": {
-      "time": 0,
+      "time": 1,
       "optimal": true,
       "obj": 14,
       "sol": [
@@ -17,7 +17,7 @@
       ]
    },
    "CBC SB": {
-      "time": 0,
+      "time": 2,
       "optimal": true,
       "obj": 14,
       "sol": [

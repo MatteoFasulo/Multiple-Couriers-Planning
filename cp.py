@@ -31,14 +31,29 @@ def main(args):
     elif args.model == 'SB':
         model = Model('model_SB.mzn')
 
+        if problem["D_symmetric"]:
+            model.add_string(
+                r"""
+                % Symmetry breaking for symmetric matrices: inverse path removal
+
+                constraint forall(k in COURIERS) (
+                    forall(i in ITEMS) (
+                        if couriers_nodes[k, i] = items+1 then
+                            i <= couriers_nodes[k, items+1]
+                        endif
+                    )
+                );
+                """
+            )
+
     if solver == Solver.lookup("gecode"):
         if problem["D_symmetric"]:
             model.add_string(
                 r"""
                 solve :: seq_search([
-                    int_search(couriers_nodes, first_fail, indomain_random),
+                    int_search(couriers_nodes, first_fail, indomain_min),
                     int_search(loads, first_fail, indomain_min)])
-                :: restart_luby(100)
+                :: restart_luby(1000)
                 :: relax_and_reconstruct(loads, 70)
                     minimize(obj);
                 """
@@ -122,20 +137,20 @@ def main(args):
 
     res = []
     for k in range(len(couriers_nodes)):
-        asg = []
+        path = []
         start = ITEMS-1
         second = couriers_nodes[k][start]
         while second != ITEMS:
-            asg.append(second)
+            path.append(second)
             start = second - 1
             second = couriers_nodes[k][start]
-        res.append(asg)
+        res.append(path)
 
     if args.verbose:
+        print(f'Status: {result.status}')
         print(f'Objective value: {obj}')
         print(f'Time needed: {time_needed} seconds')
         print(f'Solution: {res}')
-        print(f'Status: {result.status}')
 
     write_json_solution(args.instance, 'CP', f"{solver.name.lower()} {args.model}", time_needed, optimal_sol, obj, res)
 

@@ -136,7 +136,6 @@ def main(args):
     if s.check() != sat:
         raise Exception('Unsatisfiable problem') # The problem is unsatisfiable
 
-    print('Dopo il check')
     # Binary search for the optimal solution. The search is performed by decreasing the upper bound and increasing the lower bound
     # If the problem is SAT, the upper bound is decreased, otherwise the lower bound is increased until the bounds are adjacent
 

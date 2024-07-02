@@ -41,3 +41,13 @@ python check_solution.py Instances res/
 ```python
 python utils.py --runall
 ```
+
+### Docker
+
+```bash
+docker build -t MatteoFasulo/multiple-couriers-planning .
+```
+
+```bash
+docker run -it -v ./res:/src/res MatteoFasulo/multiple-couriers-planning
+```
