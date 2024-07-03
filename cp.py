@@ -31,33 +31,19 @@ def main(args):
     elif args.model == 'SB':
         model = Model('model_SB.mzn')
 
-        if problem["D_symmetric"]:
-            model.add_string(
-                r"""
-                % Symmetry breaking for symmetric matrices: inverse path removal
-
-                constraint forall(k in COURIERS) (
-                    forall(i in ITEMS) (
-                        if couriers_nodes[k, i] = items+1 then
-                            i <= couriers_nodes[k, items+1]
-                        endif
-                    )
-                );
-                """
-            )
-
     if solver == Solver.lookup("gecode"):
         if problem["D_symmetric"]:
             model.add_string(
                 r"""
                 solve :: seq_search([
-                    int_search(couriers_nodes, first_fail, indomain_min),
+                    int_search(couriers_nodes, first_fail, indomain_random),
                     int_search(loads, first_fail, indomain_min)])
-                :: restart_luby(1000)
+                :: restart_luby(100)
                 :: relax_and_reconstruct(loads, 70)
                     minimize(obj);
                 """
             )
+
         else:
             model.add_string(
                 r"""
@@ -71,15 +57,15 @@ def main(args):
     elif solver == Solver.lookup("chuffed"):
         if problem["D_symmetric"]:
             model.add_string(
-                r"""
-                include "chuffed.mzn";
-                solve :: seq_search([
-                    int_search(couriers_nodes, first_fail, indomain_min),
-                    int_search(loads, first_fail, indomain_min)])
-                %:: restart_luby(100)
-                minimize(obj);
-                """
-            )
+            r"""
+            include "chuffed.mzn";
+            solve :: seq_search([
+                int_search(couriers_nodes, first_fail, indomain_min),
+                int_search(loads, first_fail, indomain_min)])
+            minimize(obj);
+            """
+        )
+        
         else:
             model.add_string(
                 r"""
@@ -90,13 +76,6 @@ def main(args):
                     minimize(obj);
                 """
             )
-    
-    else:
-        model.add_string(
-            r"""
-            solve minimize(obj);
-            """
-        )
 
     instance = Instance(solver, model)
 
@@ -119,18 +98,10 @@ def main(args):
     couriers_nodes = result.solution.couriers_nodes
     optimal_sol = str(result.status) == 'OPTIMAL_SOLUTION'
 
-    if solver == Solver.lookup("gecode"):
-        try:
-            time_needed = result.statistics['time'].total_seconds().__floor__()
-        except KeyError:
-            time_needed = 300
-            optimal_sol = False
-    elif solver == Solver.lookup("chuffed"):
-        try:
-            time_needed = result.statistics['time'].total_seconds().__floor__()
-        except KeyError:
-            time_needed = 300
-            optimal_sol = False
+    time_needed = result.statistics['time'].total_seconds().__floor__()
+    if time_needed > args.timeout:
+        time_needed = args.timeout
+        optimal_sol = False
 
     obj = max(result.solution.obj_dist)
     ITEMS = len(couriers_nodes[0])

@@ -1,4 +1,5 @@
 from concurrent.futures import ProcessPoolExecutor
+from itertools import combinations
 import os, re, time, argparse
 from z3 import *
 
@@ -8,6 +9,24 @@ from utils import read_instance, write_json_solution, path_sequence
 # Naive pairwise encoding
 def at_least_one_np(bool_vars):
     return Or(bool_vars)
+
+def at_most_one_np(bool_vars):
+    return And([Not(And(pair[0], pair[1])) for pair in combinations(bool_vars, 2)])
+
+# Heule encoding
+def at_least_one_he(bool_vars):
+    return at_least_one_np(bool_vars)
+
+
+def at_most_one_he(bool_vars, name):
+    if len(bool_vars) <= 4:
+        return And([Not(And(pair[0], pair[1])) for pair in combinations(bool_vars, 2)])
+    y = Bool(f"y_{name}")
+    return And(And(at_most_one_np(bool_vars[:3] + [y])), And(at_most_one_he(bool_vars[3:] + [Not(y)], name+"_")))
+
+
+def exactly_one_he(bool_vars, name):
+    return And(at_most_one_he(bool_vars, name), at_least_one_he(bool_vars))
 
 # Binary encoding
 def toBinary(num, length = None):
@@ -92,7 +111,7 @@ def main(args):
     for k in range(COURIERS):
         s.add(Sum([If(TENSOR[i][j][k], SIZE[j], 0) for j in range(1, NODES) for i in range(NODES)]) <= MAX_LOAD[k])
 
-    # 6) Subtour elimination Miller-Tucker-Zemlin formulation
+    # 6) subtour elimination Miller-Tucker-Zemlin formulation
     u = [Int(f'u_{i}') for i in range(NODES)]
     Q = max(MAX_LOAD)
 
@@ -107,25 +126,26 @@ def main(args):
                     s.add(u[j] - u[i] >= SIZE[j] + If(TENSOR[i][j][k], 0, -Q))
 
     if args.model == 'SB':
-        # 7) Ordering symmetry breaking: first item delivered by each courier has a lesser value, with the last courier being an exception
-        for k in range(COURIERS-2):
-            for i in range(1, NODES-1):
-                for j in range(i + 1, NODES):
-                    s.add(Implies(TENSOR[0][j][k], Not(TENSOR[0][i][k+1])))
-
-        # 8) Symmetry breaking constraint: remove inverse path solutions
+        # 7) Symmetry breaking: impose ordering on first item delivered by couriers (2)
+        for k1 in range(COURIERS):
+            for k2 in range(k+1, COURIERS-1):
+                if MAX_LOAD[k] == MAX_LOAD[k2]:
+                    for i in range(NODES):
+                        for j in range(i + 1, NODES):
+                            s.add(Not(And(TENSOR[0][j][k1], TENSOR[0][i][k2])))
+        
+        # Only if Graph is undirected since {1,3,5,9} = {9,5,3,1}
         if symm:
+            # 8) Symmetry breaking constraint: remove inverse path solutions
             for k in range(COURIERS):
-                for i in range(1, NODES-1):
+                for i in range(NODES):
                     for j in range(i + 1, NODES):
                         s.add(Not(And(TENSOR[0][j][k], TENSOR[i][0][k])))
 
-    # Array of tour distances
-    arr_dist = []
-    for k in range(COURIERS):
-        arr_dist.append(Sum([If(TENSOR[i][j][k], int(D[i][j]), 0) for i in range(NODES) for j in range(NODES)]))
+    # Define the objective function
+    s.add(obj == max_z3([Sum([If(TENSOR[i][j][k], int(D[i][j]), 0) for i in range(NODES) for j in range(NODES)]) for k in range(COURIERS)]))
 
-    s.add(obj == max_z3(arr_dist))
+    # Add the bounds
     s.add(obj >= lower_bnd)
     s.add(obj <= upper_bnd)
 
@@ -133,8 +153,9 @@ def main(args):
     start = time.time()
     
     # Check if the problem is satisfiable
-    if s.check() != sat:
-        raise Exception('Unsatisfiable problem') # The problem is unsatisfiable
+    if s.check() != sat: # The problem is unsatisfiable
+        print('Unsatisfiable problem')
+        return args.instance, None, None
 
     # Binary search for the optimal solution. The search is performed by decreasing the upper bound and increasing the lower bound
     # If the problem is SAT, the upper bound is decreased, otherwise the lower bound is increased until the bounds are adjacent
@@ -145,10 +166,15 @@ def main(args):
     # Set the satisfiable flag to True
     satisfiable = True
     # While the problem is satisfiable keep searching for the optimal solution
-    while satisfiable and (time.time() - start) < args.timeout:
-        print('Time:', time.time() - start)
+    while satisfiable:
+        elapsed_time = time.time() - start
+        if elapsed_time >= args.timeout:
+            if args.verbose:
+                print('Timeout reached')
+            break
         # Verbose
         if args.verbose:
+            print('Time:', elapsed_time)
             print(f'Upper: {upper_bnd}\tLower: {lower_bnd}\tTime: {int(time.time() - start)}s')
         # Compute new bounds
         bound_dist = (upper_bnd - lower_bnd) / 2
@@ -174,6 +200,14 @@ def main(args):
         # Check the status of the solver
         status = s.check()
 
+        elapsed_time = time.time() - start
+        if elapsed_time >= args.timeout:
+            if args.verbose:
+                print('Timeout reached')
+            break
+        if args.verbose:
+            print('Time:', elapsed_time)
+
         # If the status is unsatisfiable, set the lower bound to the midpoint and pop the solver to the previous state
         if status == unsat:
             lower_bnd = midpoint
@@ -196,8 +230,8 @@ def main(args):
 
     time_needed = (time.time() - start).__floor__()
     if time_needed > args.timeout:
+        time_needed = args.timeout
         optimality = False
-        time_needed = 300
 
     all_paths = []
     max_cost = 0

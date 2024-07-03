@@ -67,13 +67,13 @@ constraint forall(k in COURIERS)(
     )
 );
 
-% Symmetry breaking: if item i is served by courier k then at least one other item with a smaller index is served by courier k - 1 (HC1)
-constraint forall(k in 2..couriers) (
-    forall(i in 2..items) (
-        if loads[i] = k then
-            count([loads[j] | j in 1..i-1], k-1) >= 1
+% Symmetry breaking: impose ordering on first item delivered by couriers (2)
+constraint forall(k in COURIERS)(
+    forall (k2 in k+1..couriers-1) (
+        if CAPACITY[k] = CAPACITY[k2] then
+            couriers_nodes[k, items+1] <= couriers_nodes[k2, items+1]
         endif
-    )
+    )  
 );
 
 constraint obj = max(obj_dist);

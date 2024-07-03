@@ -66,15 +66,20 @@ def main(args):
                 cvrp_model += u[i] + SIZE[j] * TENSOR[i][j][k] - Q * (1 - TENSOR[i][j][k]) <= u[j], f"Subtour_{k}_{i}_{j}"
 
     if args.model == 'SB':
-        for k in range(COURIERS-2):
-            cvrp_model += plp.lpSum([i * TENSOR[0][j][k] for i in range(1, NODES-1) for j in range(i + 1, NODES)]) <= plp.lpSum([i * TENSOR[0][j][k+1] for i in range(1, NODES-1) for j in range(i + 1, NODES)]), f"Order_{k}"
+        # 8) Symmetry breaking constraint: impose ordering on first item delivered by couriers if they have same capacity (tours can be swapped)
+        for k in range(COURIERS):
+            for k2 in range(k+1, COURIERS-1):
+                if MAX_LOAD[k] == MAX_LOAD[k2]:
+                    for i in range(NODES):
+                        for j in range(i+1, NODES):
+                            cvrp_model += TENSOR[0][j][k] + TENSOR[0][i][k2] <= 1, f"Symmetry_breaking_{k}_{k2}_{i}_{j}"
         
         # 8) Symmetry breaking constraint: remove inverse path solutions
-        if symm:
-            for k in range(COURIERS):
-                for i in range(NODES):
-                    for j in range(i + 1, NODES):
-                        cvrp_model += plp.LpConstraint(TENSOR[i][j][k] + TENSOR[j][i][k], sense=plp.LpConstraintLE, rhs=1, name=f"Symmetry_breaking_inverse_{k}_{i}_{j}")
+        #if symm:
+        #    for k in range(COURIERS):
+        #        for i in range(NODES):
+        #            for j in range(i + 1, NODES):
+        #                cvrp_model += plp.LpConstraint(TENSOR[i][j][k] + TENSOR[j][i][k], sense=plp.LpConstraintLE, rhs=1, name=f"Symmetry_breaking_inverse_{k}_{i}_{j}")
 
     # Objective function: minimize the maximum distance
     for k in range(COURIERS):

@@ -37,6 +37,3 @@ for script in "${scripts[@]}"; do
             $VERBOSE && CMD+=" --verbose"
             echo "Running command: $CMD"
             eval $CMD
-        done
-    done
-done
