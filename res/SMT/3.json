@@ -1,26 +1,6 @@
 {
-   "z3 SB": {
-      "time": 5,
-      "optimal": true,
-      "obj": 12,
-      "sol": [
-         [
-            5,
-            4,
-            2
-         ],
-         [
-            3,
-            7
-         ],
-         [
-            1,
-            6
-         ]
-      ]
-   },
    "z3 default": {
-      "time": 9,
+      "time": 6,
       "optimal": true,
       "obj": 12,
       "sol": [

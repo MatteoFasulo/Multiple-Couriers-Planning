@@ -135,12 +135,12 @@ def main(args):
                             s.add(Not(And(TENSOR[0][j][k1], TENSOR[0][i][k2])))
         
         # Only if Graph is undirected since {1,3,5,9} = {9,5,3,1}
-        if symm:
-            # 8) Symmetry breaking constraint: remove inverse path solutions
-            for k in range(COURIERS):
-                for i in range(NODES):
-                    for j in range(i + 1, NODES):
-                        s.add(Not(And(TENSOR[0][j][k], TENSOR[i][0][k])))
+        #if symm:
+        #    # 8) Symmetry breaking constraint: remove inverse path solutions
+        #    for k in range(COURIERS):
+        #        for i in range(NODES):
+        #            for j in range(i + 1, NODES):
+        #                s.add(Not(And(TENSOR[0][j][k], TENSOR[i][0][k])))
 
     # Define the objective function
     s.add(obj == max_z3([Sum([If(TENSOR[i][j][k], int(D[i][j]), 0) for i in range(NODES) for j in range(NODES)]) for k in range(COURIERS)]))
@@ -223,12 +223,11 @@ def main(args):
             optimality = True  # Set optimality to True
 
     # If the loop exited because a solution was found, set optimality to True
-    if s.check() == sat:
-        optimality = True
+    optimality = True
     if not model and last_satisfiable_model:
         model = last_satisfiable_model
 
-    time_needed = (time.time() - start).__floor__()
+    time_needed = elapsed_time.__floor__()
     if time_needed > args.timeout:
         time_needed = args.timeout
         optimality = False
