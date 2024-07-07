@@ -1,0 +1,12 @@
+version: '3.9'
+services:
+  cdmo:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ghcr.io/matteofasulo/multiple-couriers-planning:main
+    volumes:
+      - ./res:/src/res
+    container_name: mcp_project
+    network_mode: "host"
+
